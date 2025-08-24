@@ -30,7 +30,8 @@ const
         getTodayBook,
         getTopTenWeekBook,
         getTrendingBook,
-        getPopularBook
+        getPopularBook,
+        getPopularBookFilter
     } = require('./book.controller')
 
 const router = express.Router()
@@ -71,5 +72,6 @@ router.get('/getTodayBook', getTodayBook);
 router.get("/getTopTenWeekBook", getTopTenWeekBook);
 router.get("/getTrendingBook", getTrendingBook);
 router.get("/getPopularBook", getPopularBook);
+router.get("/getPopularBookFilter", getPopularBookFilter);
 
 module.exports = router

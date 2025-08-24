@@ -42,280 +42,171 @@ module.exports = app;
 //     }
 // })();
 
-//----------------------Rating Book-------------------------
-// const { addRatingBook } = require('./app/api/book/book.service');
-// const readers = [
-//     { username: "dungle94", id: "689f390b0ba6ed16dcf4764a" },
-//     { username: "thupham99", id: "689f390b0ba6ed16dcf4764f" },
-//     { username: "khoavu98", id: "689f390c0ba6ed16dcf47654" },
-//     { username: "bichdo97", id: "689f390c0ba6ed16dcf47659" },
-//     { username: "tamngo93", id: "689f390c0ba6ed16dcf4765e" },
-// ];
-
-// (async () => {
-//     try {
-//         const bookId = "687a99b7a9de141afc8ea580"; // sách cố định
-
-//         for (let reader of readers) {
-//             const stars = Math.floor(Math.random() * 5) + 1; // random 1-5
-
-//             const result = await addRatingBook(bookId, reader.id, stars);
-
-//             if (result) {
-//                 console.log(`✅ ${reader.username} đã đánh giá thành công (${stars}⭐)`);
-//             } else {
-//                 console.log(`⚠️ ${reader.username} đã đánh giá sách này trước đó!`);
-//             }
-//         }
-//     } catch (err) {
-//         console.error("❌ Lỗi khi chạy script:", err.message);
-//     }
-// })();
-
-
-//----------------------View Book-------------------------
-// const TheoDoiXemSach = require('./app/models/theodoixemsachModel');
-// // Hàm ghi nhận lượt xem
-// async function addBookView(bookId, readerId) {
-//   if (!bookId || !readerId) {
-//     throw new Error("Thiếu thông tin sách hoặc độc giả để ghi nhận lượt xem.");
-//   }
-
-//   // Tạo một record mới cho lượt xem
-//   const newView = new TheoDoiXemSach({
-//     MaSach: bookId,
-//     MaDocGia: readerId
-//   });
-
-//   const savedView = await newView.save();
-//   return savedView;
-// }
-
-// (async () => {
-//   try {
-//     const bookId = "687a99b7a9de141afc8ea580";   // ID sách cố định
-//     const readerId = "689f390b0ba6ed16dcf4764a"; // Một độc giả cụ thể
-
-//     const result = await addBookView(bookId, readerId);
-
-//     console.log(`✅ Đã ghi nhận lượt xem cho độc giả ${readerId} với sách ${bookId}`);
-//     console.log(result); // In ra document vừa lưu
-//   } catch (err) {
-//     console.error("❌ Lỗi khi chạy script:", err.message);
-//   }
-// })();
-
-
-//----------------------Borrow Book-------------------------
-// const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel');
-// async function lendBook(data) {
-//     try {
-//         const { MaSach, MaDocGia, SoLuongMuon, Msnv } = data;
-
-//         const ngayMuon = new Date();
-//         const ngayTra = new Date();
-//         ngayTra.setDate(ngayMuon.getDate() + 7); // cho mượn 1 tuần
-
-//         const record = new TheoDoiMuonSach({
-//             MaSach,
-//             MaDocGia,
-//             SoLuong: SoLuongMuon,
-//             TrangThai: 'approved',
-//             Msnv,
-//             NgayMuon: ngayMuon,
-//             NgayTra: ngayTra
-//         });
-
-//         const savedRecord = await record.save();
-//         return savedRecord;
-
-//     } catch (err) {
-//         console.error('Lỗi khi mượn sách:', err);
-//         throw err;
-//     }
-// }
-
-// // Test mượn sách
-// (async () => {
-//     try {
-//         const bookId = "687a99b7a9de141afc8ea580";   // ID sách thật
-//         const readerId = "689f390b0ba6ed16dcf4764a"; // Một độc giả thật
-//         const staffId = "6877b60c14b0cc1b10278e45";  // Nhân viên đã cho sẵn
-
-//         const result = await lendBook({
-//             MaSach: bookId,
-//             MaDocGia: readerId,
-//             SoLuongMuon: 1,
-//             Msnv: staffId
-//         });
-
-//         console.log(`✅ Độc giả ${readerId} đã mượn sách ${bookId}`);
-//         console.log(result); // In ra document vừa lưu
-
-//     } catch (err) {
-//         console.error("❌ Lỗi khi chạy script:", err.message);
-//     }
-// })();
-
-
-
 
 
 //----------------------Rating Book 2 Weeks-------------------------
 // const DanhGiaSach = require('./app/models/danhgiasachModel');
+
 // const readers = [
-//     { username: "thanhTran", id: "687113ca8d3f5218287b7651" },
-//     { username: "hoangTran", id: "68951fb83475df14e828916e" },
-//     { username: "hainguyen", id: "689f296763a64118d8c26bcc" },
-//     { username: "lanNguyen", id: "689f38b3fb95ec1614eba15d" },
-//     { username: "namPham", id: "689f38b3fb95ec1614eba162" },
-//     { username: "anhLe", id: "689f38b3fb95ec1614eba167" },
-//     { username: "hongVo", id: "689f38b3fb95ec1614eba16c" },
-//     { username: "phucNguyen", id: "689f390b0ba6ed16dcf4763f" },
-//     { username: "maiTran", id: "689f390b0ba6ed16dcf47645" },
-//     { username: "dungLe", id: "689f390b0ba6ed16dcf4764a" },
-//     { username: "thuPham", id: "689f390b0ba6ed16dcf4764f" },
-//     { username: "khoaVu", id: "689f390c0ba6ed16dcf47654" },
-//     { username: "bichDo", id: "689f390c0ba6ed16dcf47659" },
-//     { username: "tamNgo", id: "689f390c0ba6ed16dcf4765e" },
-//     { username: "yenHuynh", id: "689f390c0ba6ed16dcf47663" },
-//     { username: "huyBui", id: "689f390c0ba6ed16dcf47668" },
-//     { username: "hoaDang", id: "689f390d0ba6ed16dcf4766d" },
-//     { username: "lamTruong", id: "689f394afc24c01b60e1cc9f" },
-//     { username: "hanhNguyen", id: "689f394afc24c01b60e1cca4" },
-//     { username: "quangPhan", id: "689f394bfc24c01b60e1cca9" },
+//   { username: "thanhTran", id: "687113ca8d3f5218287b7651" },
+//   { username: "hoangTran", id: "68951fb83475df14e828916e" },
+//   { username: "hainguyen", id: "689f296763a64118d8c26bcc" },
+//   { username: "lanNguyen", id: "689f38b3fb95ec1614eba15d" },
+//   { username: "namPham", id: "689f38b3fb95ec1614eba162" },
+//   { username: "anhLe", id: "689f38b3fb95ec1614eba167" },
+//   { username: "hongVo", id: "689f38b3fb95ec1614eba16c" },
+//   { username: "phucNguyen", id: "689f390b0ba6ed16dcf4763f" },
+//   { username: "maiTran", id: "689f390b0ba6ed16dcf47645" },
+//   { username: "dungLe", id: "689f390b0ba6ed16dcf4764a" },
+//   { username: "thuPham", id: "689f390b0ba6ed16dcf4764f" },
+//   { username: "khoaVu", id: "689f390c0ba6ed16dcf47654" },
+//   { username: "bichDo", id: "689f390c0ba6ed16dcf47659" },
+//   { username: "tamNgo", id: "689f390c0ba6ed16dcf4765e" },
+//   { username: "yenHuynh", id: "689f390c0ba6ed16dcf47663" },
+//   { username: "huyBui", id: "689f390c0ba6ed16dcf47668" },
+//   { username: "hoaDang", id: "689f390d0ba6ed16dcf4766d" },
+//   { username: "lamTruong", id: "689f394afc24c01b60e1cc9f" },
+//   { username: "hanhNguyen", id: "689f394afc24c01b60e1cca4" },
+//   { username: "quangPhan", id: "689f394bfc24c01b60e1cca9" },
 // ];
 
 // const books = [
-//     { title: "The Secret Deep", id: "687a67faa9de141afc8ea572" },
-//     { title: "Giết con chim nhại", id: "687a9762a9de141afc8ea579" },
-//     { title: "Mắt Biếc", id: "687a99b7a9de141afc8ea580" },
-//     { title: "The Martian", id: "687a9a9ea9de141afc8ea587" },
-//     { title: "The Hobbit", id: "687a9b0fa9de141afc8ea58e" },
-//     { title: "1984", id: "687aa878a9de141afc8ea595" },
-//     { title: "Tuổi thơ dữ dội", id: "687aa8eaa9de141afc8ea59c" },
-//     { title: "Ngồi Khóc Trên Cây", id: "687aa9b0a9de141afc8ea5a0" },
-//     { title: "The Shining", id: "687aab5fa9de141afc8ea5a7" },
-//     { title: "Dế Mèn phiêu lưu ký", id: "687aac4da9de141afc8ea5ab" },
-//     { title: "Becoming", id: "687aaf03a9de141afc8ea5af" },
-//     { title: "Tôi thấy hoa vàng trên cỏ xanh", id: "687ab02ca9de141afc8ea5b3" },
-//     { title: "The Da Vinci Code", id: "687ab0c9a9de141afc8ea5b7" },
-//     { title: "Pride and Prejudice", id: "687ab1bea9de141afc8ea5be" },
-//     { title: "Sống Mòn", id: "687ab383a9de141afc8ea5c5" },
-//     { title: "Atomic Habits", id: "687b8566c290a2086476f28f" },
-//     { title: "Đắc Nhân Tâm", id: "687ba752c290a2086476f301" },
-//     { title: "Norwegian Wood", id: "687ba60ac290a2086476f2fa" },
-//     { title: "Deep Work", id: "687b7a30c290a2086476f281" },
-//     { title: "Dune", id: "687b908fc290a2086476f2d1" },
+//   { title: "The Secret Deep", id: "687a67faa9de141afc8ea572" },
+//   { title: "Giết con chim nhại", id: "687a9762a9de141afc8ea579" },
+//   { title: "Mắt Biếc", id: "687a99b7a9de141afc8ea580" },
+//   { title: "The Martian", id: "687a9a9ea9de141afc8ea587" },
+//   { title: "The Hobbit", id: "687a9b0fa9de141afc8ea58e" },
+//   { title: "1984", id: "687aa878a9de141afc8ea595" },
+//   { title: "Tuổi thơ dữ dội", id: "687aa8eaa9de141afc8ea59c" },
+//   { title: "Ngồi Khóc Trên Cây", id: "687aa9b0a9de141afc8ea5a0" },
+//   { title: "The Shining", id: "687aab5fa9de141afc8ea5a7" },
+//   { title: "Dế Mèn phiêu lưu ký", id: "687aac4da9de141afc8ea5ab" },
+//   { title: "Becoming", id: "687aaf03a9de141afc8ea5af" },
+//   { title: "Tôi thấy hoa vàng trên cỏ xanh", id: "687ab02ca9de141afc8ea5b3" },
+//   { title: "The Da Vinci Code", id: "687ab0c9a9de141afc8ea5b7" },
+//   { title: "Pride and Prejudice", id: "687ab1bea9de141afc8ea5be" },
+//   { title: "Sống Mòn", id: "687ab383a9de141afc8ea5c5" },
+//   { title: "Atomic Habits", id: "687b8566c290a2086476f28f" },
+//   { title: "Đắc Nhân Tâm", id: "687ba752c290a2086476f301" },
+//   { title: "Norwegian Wood", id: "687ba60ac290a2086476f2fa" },
+//   { title: "Deep Work", id: "687b7a30c290a2086476f281" },
+//   { title: "Dune", id: "687b908fc290a2086476f2d1" },
 // ];
 
 // async function createRating(bookId, readerId, stars, customDate) {
-//     const existingRating = await DanhGiaSach.findOne({
-//         MaSach: bookId,
-//         MaDocGia: readerId
-//     });
-
-//     if (existingRating) {
-//         return null;
-//     }
-
-//     const newRating = new DanhGiaSach({
-//         MaSach: bookId,
-//         MaDocGia: readerId,
-//         SoSao: stars,
-//         BinhLuan: "",
-//         NgayDanhGia: customDate,
-//         createdAt: customDate,
-//         updatedAt: customDate
-//     });
-
-//     return await newRating.save();
+//   const existingRating = await DanhGiaSach.findOne({
+//     MaSach: bookId,
+//     MaDocGia: readerId
+//   });
+//   if (existingRating) {
+//     return null;
+//   }
+//   const newRating = new DanhGiaSach({
+//     MaSach: bookId,
+//     MaDocGia: readerId,
+//     SoSao: stars,
+//     BinhLuan: "",
+//     NgayDanhGia: customDate,
+//     createdAt: customDate,
+//     updatedAt: customDate
+//   });
+//   return await newRating.save();
 // }
 
 // function getRandomBook() {
-//     const popularBooks = books.slice(0, 8);
-//     const otherBooks = books.slice(8);
-
-//     if (Math.random() < 0.7) {
-//         return popularBooks[Math.floor(Math.random() * popularBooks.length)];
-//     } else {
-//         return otherBooks[Math.floor(Math.random() * otherBooks.length)];
-//     }
+//   const popularBooks = books.slice(0, 8);
+//   const otherBooks = books.slice(8);
+//   if (Math.random() < 0.7) {
+//     return popularBooks[Math.floor(Math.random() * popularBooks.length)];
+//   } else {
+//     return otherBooks[Math.floor(Math.random() * otherBooks.length)];
+//   }
 // }
 
 // function getRandomRating() {
-//     const rand = Math.random();
-//     if (rand < 0.4) return 5;
-//     if (rand < 0.7) return 4;
-//     if (rand < 0.85) return 3;
-//     if (rand < 0.95) return 2;
-//     return 1;
+//   const rand = Math.random();
+//   if (rand < 0.4) return 5;
+//   if (rand < 0.7) return 4;
+//   if (rand < 0.85) return 3;
+//   if (rand < 0.95) return 2;
+//   return 1;
 // }
 
 // function getRandomDateInLast14Days() {
-//     const now = new Date();
-//     let adjustedDaysAgo;
-//     const rand = Math.random();
+//   const now = new Date();
+//   let adjustedDaysAgo;
+//   const rand = Math.random();
 
-//     if (rand < 0.4) {
-//         adjustedDaysAgo = Math.floor(Math.random() * 3);
-//     } else if (rand < 0.7) {
-//         adjustedDaysAgo = Math.floor(Math.random() * 4) + 3;
-//     } else {
-//         adjustedDaysAgo = Math.floor(Math.random() * 7) + 7;
-//     }
+//   if (rand < 0.4) {
+//     adjustedDaysAgo = Math.floor(Math.random() * 3) + 1; // 1–3 ngày
+//   } else if (rand < 0.7) {
+//     adjustedDaysAgo = Math.floor(Math.random() * 4) + 4; // 4–7 ngày
+//   } else {
+//     adjustedDaysAgo = Math.floor(Math.random() * 7) + 8; // 8–14 ngày
+//   }
 
-//     const targetDate = new Date(now);
-//     targetDate.setDate(now.getDate() - adjustedDaysAgo);
-
-//     const randomHour = Math.floor(Math.random() * 14) + 8;
-//     const randomMinute = Math.floor(Math.random() * 60);
-
-//     targetDate.setHours(randomHour, randomMinute, 0, 0);
-//     return targetDate;
+//   const targetDate = new Date(now);
+//   targetDate.setDate(now.getDate() - adjustedDaysAgo);
+//   const randomHour = Math.floor(Math.random() * 14) + 8;
+//   const randomMinute = Math.floor(Math.random() * 60);
+//   targetDate.setHours(randomHour, randomMinute, 0, 0);
+//   return targetDate;
 // }
 
 // (async () => {
-//     try {
-//         console.log("Bắt đầu tạo dữ liệu đánh giá sách...\n");
+//   try {
+//     console.log("Bắt đầu tạo dữ liệu đánh giá sách...\n");
+//     let successCount = 0;
+//     let duplicateCount = 0;
 
-//         let successCount = 0;
-//         let duplicateCount = 0;
-
-//         const totalRatings = Math.floor(Math.random() * 41) + 80;
-
-//         for (let i = 0; i < totalRatings; i++) {
-//             const randomReader = readers[Math.floor(Math.random() * readers.length)];
-//             const randomBook = getRandomBook();
-//             const stars = getRandomRating();
-//             const randomDate = getRandomDateInLast14Days();
-
-//             const result = await createRating(randomBook.id, randomReader.id, stars, randomDate);
-
-//             if (result) {
-//                 successCount++;
-//                 const daysAgo = Math.floor((new Date() - randomDate) / (1000 * 60 * 60 * 24));
-//                 console.log(`${randomReader.username} đã đánh giá "${randomBook.title}" (${stars} sao) - ${daysAgo} ngày trước`);
-//             } else {
-//                 duplicateCount++;
-//                 console.log(`${randomReader.username} đã đánh giá "${randomBook.title}" trước đó`);
-//             }
-
-//             await new Promise(resolve => setTimeout(resolve, 100));
-//         }
-
-//         console.log(`\nKết quả:`);
-//         console.log(`Đánh giá thành công: ${successCount}`);
-//         console.log(`Đánh giá trùng lặp: ${duplicateCount}`);
-//         console.log(`Tổng: ${successCount + duplicateCount} lần thử`);
-
-//         console.log(`\nPhân phối dữ liệu:`);
-//         console.log(`40% dữ liệu: 3 ngày gần nhất`);
-//         console.log(`30% dữ liệu: 4-7 ngày trước`);
-//         console.log(`30% dữ liệu: 8-14 ngày trước`);
-//     } catch (err) {
-//         console.error("Lỗi khi chạy script:", err.message);
+//     // Bước 1: đảm bảo mỗi sách đều có ít nhất 1 đánh giá
+//     for (const book of books) {
+//       const randomReader = readers[Math.floor(Math.random() * readers.length)];
+//       const stars = getRandomRating();
+//       const randomDate = getRandomDateInLast14Days();
+//       const result = await createRating(book.id, randomReader.id, stars, randomDate);
+//       if (result) {
+//         successCount++;
+//         const daysAgo = Math.floor((new Date() - randomDate) / (1000 * 60 * 60 * 24));
+//         console.log(`${randomReader.username} đã đánh giá "${book.title}" (${stars} sao) - ${daysAgo} ngày trước`);
+//       } else {
+//         duplicateCount++;
+//         console.log(`${randomReader.username} đã đánh giá "${book.title}" trước đó`);
+//       }
+//       await new Promise(resolve => setTimeout(resolve, 100));
 //     }
+
+//     // Bước 2: tạo thêm dữ liệu ngẫu nhiên như code cũ
+//     const totalRatings = Math.floor(Math.random() * 41) + 80;
+//     for (let i = 0; i < totalRatings; i++) {
+//       const randomReader = readers[Math.floor(Math.random() * readers.length)];
+//       const randomBook = getRandomBook();
+//       const stars = getRandomRating();
+//       const randomDate = getRandomDateInLast14Days();
+//       const result = await createRating(randomBook.id, randomReader.id, stars, randomDate);
+//       if (result) {
+//         successCount++;
+//         const daysAgo = Math.floor((new Date() - randomDate) / (1000 * 60 * 60 * 24));
+//         console.log(`${randomReader.username} đã đánh giá "${randomBook.title}" (${stars} sao) - ${daysAgo} ngày trước`);
+//       } else {
+//         duplicateCount++;
+//         console.log(`${randomReader.username} đã đánh giá "${randomBook.title}" trước đó`);
+//       }
+//       await new Promise(resolve => setTimeout(resolve, 100));
+//     }
+
+//     console.log("\nKết quả:");
+//     console.log(`Đánh giá thành công: ${successCount}`);
+//     console.log(`Đánh giá trùng lặp: ${duplicateCount}`);
+//     console.log(`Tổng: ${successCount + duplicateCount} lần thử`);
+
+//     console.log("\nPhân phối dữ liệu:");
+//     console.log("40% dữ liệu: 1-3 ngày trước");
+//     console.log("30% dữ liệu: 4-7 ngày trước");
+//     console.log("30% dữ liệu: 8-14 ngày trước");
+//   } catch (err) {
+//     console.error("Lỗi khi chạy script:", err.message);
+//   }
 // })();
 
 
@@ -409,22 +300,12 @@ module.exports = app;
 //     { title: "Dune", id: "687b908fc290a2086476f2d1" },
 //     { title: "The Name of the Wind", id: "687b9143c290a2086476f2d8" },
 //     { title: "Hiểu về trái tim", id: "687ba4a2c290a2086476f2f6" },
+//     // => Bạn có tổng cộng 51 sách thì thêm hết vào đây
 // ];
 
-// // Hàm chọn sách theo trọng số (một số sách "hot" hơn)
+// // ✅ Sửa hàm này để random đều toàn bộ sách
 // function getRandomBook() {
-//     const hotBooks = books.slice(0, 10); // 10 sách hot nhất
-//     const normalBooks = books.slice(10, 18); // 8 sách bình thường
-//     const lessPopular = books.slice(18); // Sách ít phổ biến hơn
-
-//     const rand = Math.random();
-//     if (rand < 0.5) { // 50% - sách hot
-//         return hotBooks[Math.floor(Math.random() * hotBooks.length)];
-//     } else if (rand < 0.8) { // 30% - sách bình thường  
-//         return normalBooks[Math.floor(Math.random() * normalBooks.length)];
-//     } else { // 20% - sách ít phổ biến
-//         return lessPopular[Math.floor(Math.random() * lessPopular.length)];
-//     }
+//     return books[Math.floor(Math.random() * books.length)];
 // }
 
 // // Hàm mô phỏng hành vi xem thực tế (một số độc giả active hơn)
@@ -449,58 +330,45 @@ module.exports = app;
 //     const dates = [];
 //     const totalDays = 14;
     
-//     // Phân bố theo thời gian thực tế: ngày gần đây nhiều hơn
 //     const dayWeights = [];
 //     for (let day = 0; day < totalDays; day++) {
-//         // Ngày càng gần hiện tại thì weight càng cao
-//         const weight = Math.max(0.3, 1 - (day * 0.05)); // Giảm dần từ 1.0 xuống 0.3
+//         const weight = Math.max(0.3, 1 - (day * 0.05));
 //         dayWeights.push(weight);
 //     }
     
-//     // Điều chỉnh theo ngày trong tuần
 //     const adjustWeightByDayOfWeek = (date, weight) => {
 //         const dayOfWeek = date.getDay();
 //         const weekdayMultiplier = {
-//             0: 0.7,  // Chủ nhật - ít hơn
-//             1: 1.1,  // Thứ 2 - nhiều 
-//             2: 1.2,  // Thứ 3 - nhiều
-//             3: 1.3,  // Thứ 4 - nhiều nhất
-//             4: 1.2,  // Thứ 5 - nhiều
-//             5: 1.1,  // Thứ 6 - nhiều
-//             6: 0.8   // Thứ 7 - ít hơn
+//             0: 0.7,  1: 1.1,  2: 1.2,  3: 1.3,
+//             4: 1.2,  5: 1.1,  6: 0.8
 //         };
 //         return weight * weekdayMultiplier[dayOfWeek];
 //     };
     
-//     // Tạo phân bố cho từng ngày
 //     for (let day = 0; day < totalDays; day++) {
 //         const currentDate = new Date(now);
-//         currentDate.setDate(now.getDate() - (totalDays - 1 - day)); // Đảo ngược để ngày gần nhất có index cao
+//         currentDate.setDate(now.getDate() - (totalDays - 1 - day));
         
 //         let weight = dayWeights[day];
 //         weight = adjustWeightByDayOfWeek(currentDate, weight);
         
-//         // Tính số lượng cho ngày này
 //         const baseCount = Math.floor(targetCount / totalDays * weight);
-//         const randomVariation = Math.floor(Math.random() * 4) - 1; // -1 đến 2
+//         const randomVariation = Math.floor(Math.random() * 4) - 1;
 //         const dayCount = Math.max(1, baseCount + randomVariation);
         
-//         // Tạo các thời điểm trong ngày với phân bố thực tế
 //         for (let i = 0; i < dayCount; i++) {
 //             const viewDate = new Date(currentDate);
-            
-//             // Phân bố giờ trong ngày theo thói quen thực tế
 //             let hour;
 //             const hourRand = Math.random();
-//             if (hourRand < 0.15) { // 15% - sáng sớm (7-9h)
+//             if (hourRand < 0.15) {
 //                 hour = 7 + Math.floor(Math.random() * 2);
-//             } else if (hourRand < 0.35) { // 20% - buổi sáng (9-12h)
+//             } else if (hourRand < 0.35) {
 //                 hour = 9 + Math.floor(Math.random() * 3);
-//             } else if (hourRand < 0.45) { // 10% - buổi trưa (12-14h)
+//             } else if (hourRand < 0.45) {
 //                 hour = 12 + Math.floor(Math.random() * 2);
-//             } else if (hourRand < 0.7) { // 25% - buổi chiều (14-18h)
+//             } else if (hourRand < 0.7) {
 //                 hour = 14 + Math.floor(Math.random() * 4);
-//             } else { // 30% - buổi tối (18-22h)
+//             } else {
 //                 hour = 18 + Math.floor(Math.random() * 4);
 //             }
             
@@ -510,7 +378,6 @@ module.exports = app;
 //         }
 //     }
     
-//     // Trộn ngẫu nhiên để tránh pattern
 //     for (let i = dates.length - 1; i > 0; i--) {
 //         const j = Math.floor(Math.random() * (i + 1));
 //         [dates[i], dates[j]] = [dates[j], dates[i]];
@@ -519,20 +386,14 @@ module.exports = app;
 //     return dates.slice(0, targetCount);
 // }
 
-// // Hàm tạo combinations với khả năng duplicate (vì người dùng có thể xem sách nhiều lần)
+// // Hàm tạo combinations với khả năng duplicate
 // function generateViewCombinations(targetCount) {
 //     const combinations = [];
-    
 //     for (let i = 0; i < targetCount; i++) {
 //         const reader = getRandomReader();
 //         const book = getRandomBook();
-        
-//         combinations.push({
-//             reader,
-//             book
-//         });
+//         combinations.push({ reader, book });
 //     }
-    
 //     return combinations;
 // }
 
@@ -540,21 +401,18 @@ module.exports = app;
 //     try {
 //         console.log("Bat dau tao du lieu luot xem sach phan bo deu trong 2 tuan...\n");
 
-//         const targetViewCount = 500; // Tăng lên 500 lượt xem (nhiều hơn mượn sách)
+//         const targetViewCount = 500;
 //         let successCount = 0;
 //         let errorCount = 0;
 
-//         // Tạo combinations
 //         console.log("Dang tao combinations xem sach...");
 //         const combinations = generateViewCombinations(targetViewCount);
 //         console.log(`Da tao ${combinations.length} combinations\n`);
 
-//         // Tạo ngày xem phân bố đều
 //         console.log("Dang tao phan bo ngay xem...");
 //         const viewDates = generateDistributedViewDates(targetViewCount);
 //         console.log(`Da tao ${viewDates.length} ngay xem phan bo deu\n`);
 
-//         // Thực hiện tạo dữ liệu
 //         for (let i = 0; i < Math.min(combinations.length, viewDates.length); i++) {
 //             try {
 //                 const combo = combinations[i];
@@ -572,25 +430,22 @@ module.exports = app;
 //                     console.log(`[${successCount}] ${combo.reader.username} xem "${combo.book.title}" - ${daysAgo} ngay truoc luc ${timeStr}`);
 //                 }
 
-//                 // Delay để tránh spam database
 //                 if (i % 20 === 0) {
 //                     await new Promise(resolve => setTimeout(resolve, 30));
 //                 }
 
 //             } catch (error) {
 //                 errorCount++;
-//                 if (errorCount <= 5) { // Chỉ log 5 lỗi đầu tiên
+//                 if (errorCount <= 5) {
 //                     console.log(`Loi khi tao luot xem: ${error.message}`);
 //                 }
 //             }
 
-//             // Progress indicator mỗi 50 lượt
 //             if ((i + 1) % 50 === 0) {
 //                 console.log(`--- Da xu ly ${i + 1}/${targetViewCount} luot ---`);
 //             }
 //         }
 
-//         // Thống kê kết quả
 //         console.log(`\n${'='.repeat(50)}`);
 //         console.log(`KET QUA TAO DU LIEU LUOT XEM SACH`);
 //         console.log(`${'='.repeat(50)}`);
@@ -598,7 +453,6 @@ module.exports = app;
 //         console.log(`Loi: ${errorCount} luot`);
 //         console.log(`Tong cong: ${successCount + errorCount} lan thu`);
 
-//         // Thống kê chi tiết
 //         console.log(`\n${'='.repeat(50)}`);
 //         console.log(`THONG KE CHI TIET`);
 //         console.log(`${'='.repeat(50)}`);
@@ -606,23 +460,21 @@ module.exports = app;
 //         console.log(`Trung binh moi sach: ~${(successCount / books.length).toFixed(1)} luot xem`);
 //         console.log(`Trung binh moi doc gia: ~${(successCount / readers.length).toFixed(1)} luot xem`);
 
-//         // Phân tích phân bố thời gian
 //         console.log(`\nPHAN BO THOI GIAN:`);
 //         console.log(`Du lieu duoc phan bo trong 14 ngay qua`);
 //         console.log(`Ngay gan day nhieu luot xem hon ngay cu`);
 //         console.log(`Gio cao diem: 14h-18h (25%) va 18h-22h (30%)`);
 //         console.log(`Thu 4 co nhieu luot xem nhat, chu nhat it nhat`);
 
-//         // Phân tích hành vi
 //         console.log(`\nPHAN TICH HANH VI:`);
 //         console.log(`65% luot xem tu doc gia tich cuc`);
-//         console.log(`50% luot xem tap trung vao sach hot`);
-//         console.log(`Cho phep xem sach nhieu lan (khong check duplicate)`);
+//         console.log(`Random deu tren tat ca sach (khong uu tien sach hot)`);
 
 //     } catch (err) {
 //         console.error("Loi chung khi chay script:", err.message);
 //     }
 // })();
+
 
 
 // //----------------------Borrow Book with Duplicate Check-------------------------

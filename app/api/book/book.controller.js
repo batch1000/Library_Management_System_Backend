@@ -531,12 +531,12 @@ async function getTopTenWeekBook(req, res) {
 
 async function getTrendingBook(req, res) {
     try {
-        const result = await bookService.getTrendingBook();
+        const result = await bookService.getTrendingBook(9);
 
         if (!result || result.length === 0) {
             return res.status(404).send("Không tìm thấy sách xu hướng.");
         }
-
+        
         res.json(result);
     } catch (error) {
         console.error("❌ Lỗi khi lấy sách xu hướng:", error);
@@ -546,12 +546,27 @@ async function getTrendingBook(req, res) {
 
 async function getPopularBook(req, res) {
     try {
+        const result = await bookService.getPopularBook(6);
+
+        if (!result || result.length === 0) {
+            return res.status(404).send("Không tìm thấy sách phổ biến.");
+        }
+
+        res.json(result);
+    } catch (error) {
+        console.error("❌ Lỗi khi lấy sách phổ biến:", error);
+        res.status(500).send("Lỗi khi lấy sách phổ biến");
+    }
+}
+
+async function getPopularBookFilter(req, res) {
+    try {
         const result = await bookService.getPopularBook();
 
         if (!result || result.length === 0) {
             return res.status(404).send("Không tìm thấy sách phổ biến.");
         }
-        console.log(result);
+
         res.json(result);
     } catch (error) {
         console.error("❌ Lỗi khi lấy sách phổ biến:", error);
@@ -588,5 +603,6 @@ module.exports = {
     getTodayBook,
     getTopTenWeekBook,
     getTrendingBook,
-    getPopularBook
+    getPopularBook,
+    getPopularBookFilter
 };

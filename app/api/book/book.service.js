@@ -598,173 +598,6 @@ async function getMostViewBook() {
   return topBooks;
 }
 
-async function getTodayBook(limit = 6) {
-  // đảm bảo limit là số dương hợp lệ
-  limit = Math.max(1, parseInt(limit) || 6);
-
-  // xác định khoảng thời gian "hôm nay"
-  let startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  let endOfDay = new Date(startOfDay);
-  endOfDay.setDate(startOfDay.getDate() + 1);
-
-  let allScoredBooks = []; // tích lũy sách từ nhiều ngày
-  const processedBookIds = new Set(); // tránh trùng lặp
-
-  // Hàm gom dữ liệu 1 ngày
-  async function getDayData(start, end) {
-    const viewsAgg = await TheoDoiXemSach.aggregate([
-      { $match: { ThoiDiemXem: { $gte: start, $lt: end } } },
-      { $group: { _id: '$MaSach', views_today: { $sum: 1 } } }
-    ]);
-
-    const borrowsAgg = await TheoDoiMuonSach.aggregate([
-      {
-        $match: {
-          NgayMuon: { $gte: start, $lt: end },
-          TrangThai: { $in: ['approved', 'returned'] }
-        }
-      },
-      { $group: { _id: '$MaSach', borrows_today: { $sum: 1 } } }
-    ]);
-
-    const ratingsAgg = await DanhGiaSach.aggregate([
-      { $match: { NgayDanhGia: { $gte: start, $lt: end } } },
-      { $group: { _id: '$MaSach', ratings_today: { $sum: 1 } } }
-    ]);
-
-    const scoreMap = new Map();
-
-    function ensureEntry(bookIdStr) {
-      if (!scoreMap.has(bookIdStr)) {
-        scoreMap.set(bookIdStr, { views_today: 0, borrows_today: 0, ratings_today: 0 });
-      }
-      return scoreMap.get(bookIdStr);
-    }
-
-    viewsAgg.forEach(d => {
-      const idStr = d._id.toString();
-      const entry = ensureEntry(idStr);
-      entry.views_today = d.views_today || 0;
-    });
-
-    borrowsAgg.forEach(d => {
-      const idStr = d._id.toString();
-      const entry = ensureEntry(idStr);
-      entry.borrows_today = d.borrows_today || 0;
-    });
-
-    ratingsAgg.forEach(d => {
-      const idStr = d._id.toString();
-      const entry = ensureEntry(idStr);
-      entry.ratings_today = d.ratings_today || 0;
-    });
-
-    const result = [];
-    for (const [bookIdStr, counts] of scoreMap.entries()) {
-      // Chỉ thêm sách chưa được xử lý (tránh trùng lặp)
-      if (!processedBookIds.has(bookIdStr)) {
-        const score_today =
-          0.4 * (counts.views_today || 0) +
-          0.4 * (counts.borrows_today || 0) +
-          0.2 * (counts.ratings_today || 0);
-
-        result.push({
-          bookIdStr,
-          views_today: counts.views_today || 0,
-          borrows_today: counts.borrows_today || 0,
-          ratings_today: counts.ratings_today || 0,
-          score_today
-        });
-
-        processedBookIds.add(bookIdStr);
-      }
-    }
-
-    return result;
-  }
-
-  // Fallback logic: lùi ngày cho đến khi đủ sách
-  let tries = 0;
-  while (allScoredBooks.length < limit && tries < 30) {
-    const dayData = await getDayData(startOfDay, endOfDay);
-
-    // Thêm sách từ ngày này vào tổng
-    allScoredBooks.push(...dayData);
-
-    // console.log(`Ngày ${startOfDay.toDateString()}: +${dayData.length} sách, tổng: ${allScoredBooks.length}/${limit}`);
-
-    // Nếu đã đủ sách thì dừng
-    if (allScoredBooks.length >= limit) {
-      break;
-    }
-
-    // Lùi thêm 1 ngày
-    startOfDay.setDate(startOfDay.getDate() - 1);
-    endOfDay.setDate(endOfDay.getDate() - 1);
-    tries++;
-  }
-
-  // nếu vẫn trống sau khi fallback → trả mảng rỗng
-  if (allScoredBooks.length === 0) {
-    console.log('❌ Không tìm thấy sách nào trong 30 ngày qua');
-    return [];
-  }
-
-  // Sort giảm dần theo score_today và cắt top limit
-  allScoredBooks.sort((a, b) => b.score_today - a.score_today);
-  const topSlice = allScoredBooks.slice(0, limit);
-
-  // console.log(`✅ Lấy được ${topSlice.length}/${limit} sách từ ${tries + 1} ngày`);
-
-  // Lấy thông tin sách từ collection Sach
-  const bookIds = topSlice.map((s) => mongoose.Types.ObjectId(s.bookIdStr));
-
-  const bookDocs = await Sach.find({ _id: { $in: bookIds } })
-    .select('MaSach TenSach TacGia Image')
-    .lean();
-
-  const bookDocMap = new Map(bookDocs.map(b => [b._id.toString(), b]));
-
-  // Tính số sao trung bình cho từng sách
-  const ratingsData = await DanhGiaSach.aggregate([
-    { $match: { MaSach: { $in: bookIds } } },
-    {
-      $group: {
-        _id: '$MaSach',
-        avgRating: { $avg: '$SoSao' },
-        totalRatings: { $sum: 1 }
-      }
-    }
-  ]);
-
-  const ratingsMap = new Map(ratingsData.map(r => [r._id.toString(), {
-    avgRating: r.avgRating || 0,
-    totalRatings: r.totalRatings || 0
-  }]));
-
-  // Gộp thông tin sách vào kết quả trả về, giữ đúng thứ tự của topSlice
-  const finalResult = topSlice.map(item => {
-    const doc = bookDocMap.get(item.bookIdStr);
-    const rating = ratingsMap.get(item.bookIdStr) || { avgRating: 0, totalRatings: 0 };
-
-    return {
-      _id: doc ? doc._id : mongoose.Types.ObjectId(item.bookIdStr),
-      MaSach: doc ? doc.MaSach : null,
-      TenSach: doc ? doc.TenSach : '',
-      TacGia: doc ? doc.TacGia : '',
-      Image: doc ? doc.Image : '',
-      views_today: item.views_today,
-      borrows_today: item.borrows_today,
-      ratings_today: item.ratings_today,
-      score_today: item.score_today,
-      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)) // Làm tròn 1 chữ số thập phân
-    };
-  });
-
-  return finalResult;
-}
-
 async function getTopTenWeekBook(limit = 10) {
   // đảm bảo limit là số dương hợp lệ
   limit = Math.max(1, parseInt(limit) || 10);
@@ -933,9 +766,178 @@ async function getTopTenWeekBook(limit = 10) {
   return finalResult;
 }
 
-async function getTrendingBook() {
-  // luôn lấy 3 sách
-  const limit = 3;
+async function getTodayBook(limit = 6) {
+  // đảm bảo limit là số dương hợp lệ
+  limit = Math.max(1, parseInt(limit) || 6);
+
+  // xác định khoảng thời gian "hôm nay"
+  let startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  let endOfDay = new Date(startOfDay);
+  endOfDay.setDate(startOfDay.getDate() + 1);
+
+  let allScoredBooks = []; // tích lũy sách từ nhiều ngày
+  const processedBookIds = new Set(); // tránh trùng lặp
+
+  // Hàm gom dữ liệu 1 ngày
+  async function getDayData(start, end) {
+    const viewsAgg = await TheoDoiXemSach.aggregate([
+      { $match: { ThoiDiemXem: { $gte: start, $lt: end } } },
+      { $group: { _id: '$MaSach', views_today: { $sum: 1 } } }
+    ]);
+
+    const borrowsAgg = await TheoDoiMuonSach.aggregate([
+      {
+        $match: {
+          NgayMuon: { $gte: start, $lt: end },
+          TrangThai: { $in: ['approved', 'returned'] }
+        }
+      },
+      { $group: { _id: '$MaSach', borrows_today: { $sum: 1 } } }
+    ]);
+
+    const ratingsAgg = await DanhGiaSach.aggregate([
+      { $match: { NgayDanhGia: { $gte: start, $lt: end } } },
+      { $group: { _id: '$MaSach', ratings_today: { $sum: 1 } } }
+    ]);
+
+    const scoreMap = new Map();
+
+    function ensureEntry(bookIdStr) {
+      if (!scoreMap.has(bookIdStr)) {
+        scoreMap.set(bookIdStr, { views_today: 0, borrows_today: 0, ratings_today: 0 });
+      }
+      return scoreMap.get(bookIdStr);
+    }
+
+    viewsAgg.forEach(d => {
+      const idStr = d._id.toString();
+      const entry = ensureEntry(idStr);
+      entry.views_today = d.views_today || 0;
+    });
+
+    borrowsAgg.forEach(d => {
+      const idStr = d._id.toString();
+      const entry = ensureEntry(idStr);
+      entry.borrows_today = d.borrows_today || 0;
+    });
+
+    ratingsAgg.forEach(d => {
+      const idStr = d._id.toString();
+      const entry = ensureEntry(idStr);
+      entry.ratings_today = d.ratings_today || 0;
+    });
+
+    const result = [];
+    for (const [bookIdStr, counts] of scoreMap.entries()) {
+      // Chỉ thêm sách chưa được xử lý (tránh trùng lặp)
+      if (!processedBookIds.has(bookIdStr)) {
+        const score_today =
+          0.7 * (counts.views_today || 0) +
+          0.2 * (counts.borrows_today || 0) +
+          0.1 * (counts.ratings_today || 0);
+
+        result.push({
+          bookIdStr,
+          views_today: counts.views_today || 0,
+          borrows_today: counts.borrows_today || 0,
+          ratings_today: counts.ratings_today || 0,
+          score_today
+        });
+
+        processedBookIds.add(bookIdStr);
+      }
+    }
+
+    return result;
+  }
+
+  // Fallback logic: lùi ngày cho đến khi đủ sách
+  let tries = 0;
+  while (allScoredBooks.length < limit && tries < 30) {
+    const dayData = await getDayData(startOfDay, endOfDay);
+
+    // Thêm sách từ ngày này vào tổng
+    allScoredBooks.push(...dayData);
+
+    // console.log(`Ngày ${startOfDay.toDateString()}: +${dayData.length} sách, tổng: ${allScoredBooks.length}/${limit}`);
+
+    // Nếu đã đủ sách thì dừng
+    if (allScoredBooks.length >= limit) {
+      break;
+    }
+
+    // Lùi thêm 1 ngày
+    startOfDay.setDate(startOfDay.getDate() - 1);
+    endOfDay.setDate(endOfDay.getDate() - 1);
+    tries++;
+  }
+
+  // nếu vẫn trống sau khi fallback → trả mảng rỗng
+  if (allScoredBooks.length === 0) {
+    console.log('❌ Không tìm thấy sách nào trong 30 ngày qua');
+    return [];
+  }
+
+  // Sort giảm dần theo score_today và cắt top limit
+  allScoredBooks.sort((a, b) => b.score_today - a.score_today);
+  const topSlice = allScoredBooks.slice(0, limit);
+
+  // console.log(`✅ Lấy được ${topSlice.length}/${limit} sách từ ${tries + 1} ngày`);
+
+  // Lấy thông tin sách từ collection Sach
+  const bookIds = topSlice.map((s) => mongoose.Types.ObjectId(s.bookIdStr));
+
+  const bookDocs = await Sach.find({ _id: { $in: bookIds } })
+    .select('MaSach TenSach TacGia Image')
+    .lean();
+
+  const bookDocMap = new Map(bookDocs.map(b => [b._id.toString(), b]));
+
+  // Tính số sao trung bình cho từng sách
+  const ratingsData = await DanhGiaSach.aggregate([
+    { $match: { MaSach: { $in: bookIds } } },
+    {
+      $group: {
+        _id: '$MaSach',
+        avgRating: { $avg: '$SoSao' },
+        totalRatings: { $sum: 1 }
+      }
+    }
+  ]);
+
+  const ratingsMap = new Map(ratingsData.map(r => [r._id.toString(), {
+    avgRating: r.avgRating || 0,
+    totalRatings: r.totalRatings || 0
+  }]));
+
+  // Gộp thông tin sách vào kết quả trả về, giữ đúng thứ tự của topSlice
+  const finalResult = topSlice.map(item => {
+    const doc = bookDocMap.get(item.bookIdStr);
+    const rating = ratingsMap.get(item.bookIdStr) || { avgRating: 0, totalRatings: 0 };
+
+    return {
+      _id: doc ? doc._id : mongoose.Types.ObjectId(item.bookIdStr),
+      MaSach: doc ? doc.MaSach : null,
+      TenSach: doc ? doc.TenSach : '',
+      TacGia: doc ? doc.TacGia : '',
+      Image: doc ? doc.Image : '',
+      views_today: item.views_today,
+      borrows_today: item.borrows_today,
+      ratings_today: item.ratings_today,
+      score_today: item.score_today,
+      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)) // Làm tròn 1 chữ số thập phân
+    };
+  });
+
+  return finalResult;
+}
+
+async function getTrendingBook(limit) {
+  // Nếu có truyền limit thì đảm bảo là số dương hợp lệ
+  if (limit !== undefined && limit !== null) {
+    limit = Math.max(1, parseInt(limit) || 1);
+  }
 
   // xác định khoảng thời gian cho tính growth_rate
   let endOfPeriod = new Date();
@@ -1037,8 +1039,39 @@ async function getTrendingBook() {
       if (!processedBookIds.has(bookIdStr)) {
         const recent_activity = counts.views_7d + counts.borrows_7d + counts.ratings_7d;
         const total_activity = counts.views_14d + counts.borrows_14d + counts.ratings_14d;
+        const previous_activity = total_activity - recent_activity;
 
-        const growth_rate = recent_activity / Math.max(1, total_activity);
+        let trending_score = 0;
+
+        // CÔNG THỨC MỚI: ANTI-POPULAR + FRESH DISCOVERY
+        
+        // Bước 1: Lọc sách - chỉ xét sách chưa quá popular (total < 120)
+        if (total_activity >= 120) {
+          // console.log(`Loai sach qua popular - Book: ${bookIdStr}, total_activity: ${total_activity} >= 120`);
+        } 
+        // Bước 2: Phải có hoạt động tối thiểu trong 7 ngày gần
+        else if (recent_activity < 8) {
+          // console.log(`Khong du hoat dong gan day - Book: ${bookIdStr}, recent_activity: ${recent_activity} < 8`);
+        }
+        // Bước 3: Tính điểm cho sách fresh/trending
+        else {
+          // Freshness bonus: sách càng ít lịch sử càng được ưu tiên
+          const freshness_bonus = Math.max(0.3, (120 - total_activity) / 120);
+          
+          // Recent momentum: nhân đôi trọng số hoạt động gần đây
+          const recent_momentum = recent_activity * 2;
+          
+          // Growth factor: nếu có tăng trưởng thì bonus
+          let growth_factor = 1.0;
+          if (previous_activity > 0 && recent_activity > previous_activity) {
+            growth_factor = 1 + Math.min((recent_activity - previous_activity) / previous_activity, 1.0);
+          }
+          
+          // Công thức cuối: Fresh Discovery Score
+          trending_score = recent_momentum * freshness_bonus * growth_factor;
+          
+          // console.log(`Fresh Discovery - Book: ${bookIdStr}, recent: ${recent_activity}, total: ${total_activity}, freshness_bonus: ${freshness_bonus.toFixed(2)}, growth_factor: ${growth_factor.toFixed(2)}, trending_score: ${trending_score.toFixed(3)}`);
+        }
 
         result.push({
           bookIdStr,
@@ -1048,7 +1081,7 @@ async function getTrendingBook() {
           views_14d: counts.views_14d,
           borrows_14d: counts.borrows_14d,
           ratings_14d: counts.ratings_14d,
-          growth_rate
+          growth_rate: trending_score
         });
 
         processedBookIds.add(bookIdStr);
@@ -1060,11 +1093,11 @@ async function getTrendingBook() {
 
   // Fallback logic: lùi period cho đến khi đủ sách
   let tries = 0;
-  while (allScoredBooks.length < limit && tries < 12) {
+  while ((!limit || allScoredBooks.length < limit) && tries < 12) {
     const periodData = await getPeriodData(startOfWeek, endOfPeriod, startOf2Weeks);
     allScoredBooks.push(...periodData);
 
-    if (allScoredBooks.length >= limit) break;
+    if (limit && allScoredBooks.length >= limit) break;
 
     startOfWeek.setDate(startOfWeek.getDate() - 14);
     startOf2Weeks.setDate(startOf2Weeks.getDate() - 14);
@@ -1076,9 +1109,18 @@ async function getTrendingBook() {
     return [];
   }
 
-  // Sắp xếp theo growth_rate giảm dần, cắt đúng 3 sách
-  allScoredBooks.sort((a, b) => b.growth_rate - a.growth_rate);
-  const topSlice = allScoredBooks.slice(0, limit);
+  // Lọc ra chỉ những sách có trending_score > 0
+  const validTrendingBooks = allScoredBooks.filter(book => book.growth_rate > 0);
+
+  if (validTrendingBooks.length === 0) {
+    return [];
+  }
+
+  // Sắp xếp theo growth_rate giảm dần
+  validTrendingBooks.sort((a, b) => b.growth_rate - a.growth_rate);
+
+  // Nếu có limit thì slice, nếu không thì lấy hết
+  const topSlice = limit ? validTrendingBooks.slice(0, limit) : validTrendingBooks;
 
   // Lấy thông tin sách
   const bookIds = topSlice.map(s => mongoose.Types.ObjectId(s.bookIdStr));
@@ -1128,9 +1170,11 @@ async function getTrendingBook() {
   return finalResult;
 }
 
-async function getPopularBook(limit = 6) {
-  // đảm bảo limit là số dương hợp lệ
-  limit = Math.max(1, parseInt(limit) || 6);
+async function getPopularBook(limit) {
+  // Nếu có truyền limit thì đảm bảo là số dương hợp lệ
+  if (limit !== undefined && limit !== null) {
+    limit = Math.max(1, parseInt(limit) || 1);
+  }
 
   // Lấy tổng views cho mỗi sách
   const viewsAgg = await TheoDoiXemSach.aggregate([
@@ -1184,14 +1228,16 @@ async function getPopularBook(limit = 6) {
     return [];
   }
 
-  // Sắp xếp theo score giảm dần, lấy top limit
+  // Sắp xếp theo score giảm dần
   scoredBooks.sort((a, b) => b.score - a.score);
-  const topSlice = scoredBooks.slice(0, limit);
+
+  // Nếu có limit thì slice, nếu không thì lấy hết
+  const topSlice = limit ? scoredBooks.slice(0, limit) : scoredBooks;
 
   // Lấy thông tin sách
   const bookIds = topSlice.map(s => mongoose.Types.ObjectId(s.bookIdStr));
   const bookDocs = await Sach.find({ _id: { $in: bookIds } })
-    .select('MaSach TenSach TacGia Image')
+    .select('MaSach TenSach TacGia Image DonGia')
     .lean();
   const bookDocMap = new Map(bookDocs.map(b => [b._id.toString(), b]));
 
@@ -1222,6 +1268,7 @@ async function getPopularBook(limit = 6) {
       TenSach: doc ? doc.TenSach : '',
       TacGia: doc ? doc.TacGia : '',
       Image: doc ? doc.Image : '',
+      DonGia: doc ? doc.DonGia : '',
       views: item.views,
       borrows: item.borrows,
       ratings: item.ratings,
