@@ -477,30 +477,48 @@ module.exports = app;
 
 
 
-// //----------------------Borrow Book with Duplicate Check-------------------------
+//----------------------Delete All Borrow Records-------------------------
 // const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel');
 
+// async function deleteAllBorrowRecords() {
+//     try {
+//         const result = await TheoDoiMuonSach.deleteMany({}); // xóa hết
+//         console.log(`🗑️ Đã xóa ${result.deletedCount} lượt mượn sách trong hệ thống.`);
+//     } catch (err) {
+//         console.error("❌ Lỗi khi xóa dữ liệu mượn sách:", err.message);
+//     }
+// }
+
+// // // Chạy function
+// (async () => {
+//     await deleteAllBorrowRecords();
+// })();
+
+
+// // //----------------------Borrow Book with Duplicate Check-------------------------
+// const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel');
+
+// // Hàm cho 1 lượt mượn sách
 // async function lendBook(data) {
 //     try {
 //         const { MaSach, MaDocGia, SoLuongMuon, Msnv, NgayMuonCustom } = data;
 
-//         // Kiểm tra xem độc giả này có đang mượn sách này chưa
+//         // Kiểm tra xem độc giả này đã mượn sách này chưa
 //         const existingBorrow = await TheoDoiMuonSach.findOne({
 //             MaSach: MaSach,
 //             MaDocGia: MaDocGia,
-//             TrangThai: 'approved' // Chỉ check những sách đang được mượn
+//             TrangThai: 'approved' // chỉ check những sách đang được mượn
 //         });
 
 //         if (existingBorrow) {
 //             throw new Error(`Độc giả đang mượn sách này rồi`);
 //         }
 
-//         // Sử dụng ngày mượn tùy chỉnh nếu có, không thì random như cũ
+//         // Ngày mượn: dùng custom nếu có, không thì random trong 2 tuần gần nhất
 //         let ngayMuon;
 //         if (NgayMuonCustom) {
 //             ngayMuon = NgayMuonCustom;
 //         } else {
-//             // Random ngày mượn trong vòng 2 tuần trở lại đây
 //             const now = new Date();
 //             const twoWeeksAgo = new Date();
 //             twoWeeksAgo.setDate(now.getDate() - 14);
@@ -509,8 +527,8 @@ module.exports = app;
 //             ngayMuon = new Date(randomTime);
 //         }
 
-//         const ngayTra = new Date(ngayMuon);
-//         ngayTra.setDate(ngayMuon.getDate() + 7); // cho mượn 1 tuần
+//         const NgayTra = new Date(ngayMuon);
+//         NgayTra.setDate(ngayMuon.getDate() + 7); // cho mượn 1 tuần
 
 //         const record = new TheoDoiMuonSach({
 //             MaSach,
@@ -519,7 +537,8 @@ module.exports = app;
 //             TrangThai: 'approved',
 //             Msnv,
 //             NgayMuon: ngayMuon,
-//             NgayTra: ngayTra,
+//             NgayTra: NgayTra,
+//             NgayGhiNhanTra: null, // luôn null khi tạo mới
 //             DaGiaHan: false
 //         });
 
@@ -532,6 +551,7 @@ module.exports = app;
 //     }
 // }
 
+// // ================== DATA ===================
 // const readers = [
 //     { username: "thanhTran", id: "687113ca8d3f5218287b7651" },
 //     { username: "hoangTran", id: "68951fb83475df14e828916e" },
@@ -589,103 +609,106 @@ module.exports = app;
 //     { title: "The Name of the Wind", id: "687b9143c290a2086476f2d8" },
 // ];
 
-// // Hàm chọn sách theo độ phổ biến cho việc mượn
-// function getRandomBookForBorrow() {
-//     const popularBooks = books.slice(0, 8);   // Sách phổ biến, dễ mượn
-//     const mediumBooks = books.slice(8, 16);   // Sách trung bình
-//     const lessPopular = books.slice(16);      // Sách ít được mượn
+// // ================== FUNCTIONS ===================
 
-//     const rand = Math.random();
-//     if (rand < 0.6) { // 60% - sách phổ biến
-//         return popularBooks[Math.floor(Math.random() * popularBooks.length)];
-//     } else if (rand < 0.85) { // 25% - sách trung bình
-//         return mediumBooks[Math.floor(Math.random() * mediumBooks.length)];
-//     } else { // 15% - sách ít phổ biến
-//         return lessPopular[Math.floor(Math.random() * lessPopular.length)];
-//     }
-// }
-
-// // Hàm chọn độc giả theo thói quen mượn sách
+// // random reader (giữ phân nhóm như cũ)
 // function getRandomReaderForBorrow() {
-//     const frequentReaders = readers.slice(0, 10); // 10 độc giả mượn nhiều
-//     const normalReaders = readers.slice(10, 20);  // 10 độc giả bình thường  
-//     const occasionalReaders = readers.slice(20);  // 7 độc giả thỉnh thoảng mượn
+//     const frequentReaders = readers.slice(0, 10);
+//     const normalReaders = readers.slice(10, 20);
+//     const occasionalReaders = readers.slice(20);
 
 //     const rand = Math.random();
-//     if (rand < 0.5) { // 50% - độc giả mượn thường xuyên
-//         return frequentReaders[Math.floor(Math.random() * frequentReaders.length)];
-//     } else if (rand < 0.8) { // 30% - độc giả bình thường
-//         return normalReaders[Math.floor(Math.random() * normalReaders.length)];
-//     } else { // 20% - độc giả thỉnh thoảng
-//         return occasionalReaders[Math.floor(Math.random() * occasionalReaders.length)];
-//     }
+//     if (rand < 0.5) return frequentReaders[Math.floor(Math.random() * frequentReaders.length)];
+//     if (rand < 0.8) return normalReaders[Math.floor(Math.random() * normalReaders.length)];
+//     return occasionalReaders[Math.floor(Math.random() * occasionalReaders.length)];
 // }
 
-// // Hàm random số lượng mượn thực tế
+// // random sách từ toàn bộ 51 sách
+// function getRandomBookForBorrow() {
+//     const randomIndex = Math.floor(Math.random() * books.length);
+//     return books[randomIndex];
+// }
+
+// // random số lượng
 // function getRandomBorrowQuantity() {
 //     const rand = Math.random();
-//     if (rand < 0.75) return 1; // 75% mượn 1 cuốn
-//     if (rand < 0.95) return 2; // 20% mượn 2 cuốn  
-//     return 3; // 5% mượn 3 cuốn
+//     if (rand < 0.75) return 1;
+//     if (rand < 0.95) return 2;
+//     return 3;
 // }
 
-// // Hàm tạo ngày mượn phân bố đều trong 2 tuần
+// // random ngày mượn phân bố 14 ngày
 // function generateDistributedBorrowDates(targetCount) {
 //     const now = new Date();
 //     const twoWeeksAgo = new Date();
 //     twoWeeksAgo.setDate(now.getDate() - 14);
-    
+
 //     const dates = [];
 //     const totalDays = 14;
-    
-//     // Tạo phân bố theo các ngày trong tuần
-//     // Thứ 2-6: nhiều hơn, thứ 7-CN: ít hơn
+
 //     const dayWeights = {
-//         0: 0.8,  // Chủ nhật - ít
-//         1: 1.2,  // Thứ 2 - nhiều
-//         2: 1.3,  // Thứ 3 - nhiều  
-//         3: 1.4,  // Thứ 4 - nhiều nhất
-//         4: 1.3,  // Thứ 5 - nhiều
-//         5: 1.2,  // Thứ 6 - nhiều
-//         6: 0.9   // Thứ 7 - ít
+//         0: 0.8,
+//         1: 1.2,
+//         2: 1.3,
+//         3: 1.4,
+//         4: 1.3,
+//         5: 1.2,
+//         6: 0.9
 //     };
-    
-//     // Tạo phân bố cho từng ngày
+
 //     for (let day = 0; day < totalDays; day++) {
 //         const currentDate = new Date(twoWeeksAgo);
 //         currentDate.setDate(twoWeeksAgo.getDate() + day);
-        
+
 //         const dayOfWeek = currentDate.getDay();
 //         const weight = dayWeights[dayOfWeek];
-        
-//         // Tính số lượng cho ngày này (với một chút random)
+
 //         const baseCount = Math.floor(targetCount / totalDays * weight);
-//         const randomVariation = Math.floor(Math.random() * 3) - 1; // -1, 0, hoặc 1
+//         const randomVariation = Math.floor(Math.random() * 3) - 1;
 //         const dayCount = Math.max(1, baseCount + randomVariation);
-        
-//         // Tạo các thời điểm trong ngày (giờ làm việc 8h-17h)
+
 //         for (let i = 0; i < dayCount; i++) {
 //             const borrowDate = new Date(currentDate);
-            
-//             // Random giờ trong ngày làm việc (8h-17h)
 //             const hour = 8 + Math.floor(Math.random() * 9);
 //             const minute = Math.floor(Math.random() * 60);
-            
+
 //             borrowDate.setHours(hour, minute, 0, 0);
 //             dates.push(borrowDate);
 //         }
 //     }
-    
-//     // Trộn ngẫu nhiên array để tránh pattern
+
+//     // shuffle
 //     for (let i = dates.length - 1; i > 0; i--) {
 //         const j = Math.floor(Math.random() * (i + 1));
 //         [dates[i], dates[j]] = [dates[j], dates[i]];
 //     }
-    
+
 //     return dates.slice(0, targetCount);
 // }
 
-// // Hàm kiểm tra nếu combination đã exist
+// // tránh duplicate combination
+// function generateUniqueCombinations(targetCount) {
+//     const combinations = [];
+//     const used = new Set();
+//     let attempts = 0;
+//     const maxAttempts = targetCount * 5;
+
+//     while (combinations.length < targetCount && attempts < maxAttempts) {
+//         const reader = getRandomReaderForBorrow();
+//         const book = getRandomBookForBorrow();
+//         const quantity = getRandomBorrowQuantity();
+
+//         const key = `${book.id}-${reader.id}`;
+//         if (!used.has(key)) {
+//             used.add(key);
+//             combinations.push({ reader, book, quantity, key });
+//         }
+//         attempts++;
+//     }
+//     return combinations;
+// }
+
+// // check trong DB
 // async function checkExistingCombination(MaSach, MaDocGia) {
 //     try {
 //         const existing = await TheoDoiMuonSach.findOne({
@@ -694,70 +717,34 @@ module.exports = app;
 //             TrangThai: 'approved'
 //         });
 //         return !!existing;
-//     } catch (error) {
+//     } catch {
 //         return false;
 //     }
 // }
 
-// // Hàm tạo combinations unique
-// function generateUniqueCombinations(targetCount) {
-//     const combinations = [];
-//     const used = new Set();
-    
-//     let attempts = 0;
-//     const maxAttempts = targetCount * 3; // Để đảm bảo có đủ combinations
-    
-//     while (combinations.length < targetCount && attempts < maxAttempts) {
-//         const reader = getRandomReaderForBorrow();
-//         const book = getRandomBookForBorrow();
-//         const quantity = getRandomBorrowQuantity();
-        
-//         const key = `${book.id}-${reader.id}`;
-        
-//         if (!used.has(key)) {
-//             used.add(key);
-//             combinations.push({
-//                 reader,
-//                 book,
-//                 quantity,
-//                 key
-//             });
-//         }
-        
-//         attempts++;
-//     }
-    
-//     return combinations;
-// }
-
+// // ================== MAIN SCRIPT ===================
 // (async () => {
 //     try {
-//         console.log("Bắt đầu tạo dữ liệu mượn sách phân bố đều trong 2 tuần...\n");
+//         console.log("Bắt đầu tạo dữ liệu mượn sách...\n");
 
 //         const staffId = "6877b60c14b0cc1b10278e45";
-//         const targetSuccessCount = 150; // Tăng target lên 150
-        
-//         let successCount = 0;
-//         let errorCount = 0;
-//         let duplicateCount = 0;
+//         const targetSuccessCount = 150;
 
-//         // Tạo các combinations unique trước
-//         console.log("Đang tạo combinations unique...");
-//         const combinations = generateUniqueCombinations(targetSuccessCount * 1.2); // Tạo thêm 20% để dự phòng
-//         console.log(`Đã tạo ${combinations.length} combinations unique\n`);
+//         let successCount = 0, errorCount = 0, duplicateCount = 0;
 
-//         // Tạo các ngày mượn phân bố đều
+//         console.log("Đang tạo combinations...");
+//         const combinations = generateUniqueCombinations(targetSuccessCount * 1.2);
+//         console.log(`Đã tạo ${combinations.length} combinations\n`);
+
 //         console.log("Đang tạo phân bố ngày mượn...");
 //         const borrowDates = generateDistributedBorrowDates(targetSuccessCount);
-//         console.log(`Đã tạo ${borrowDates.length} ngày mượn phân bố đều\n`);
+//         console.log(`Đã tạo ${borrowDates.length} ngày mượn\n`);
 
-//         // Thực hiện tạo dữ liệu
 //         for (let i = 0; i < Math.min(combinations.length, borrowDates.length); i++) {
 //             try {
 //                 const combo = combinations[i];
 //                 const borrowDate = borrowDates[i];
-                
-//                 // Kiểm tra trước khi tạo để tránh duplicate
+
 //                 const exists = await checkExistingCombination(combo.book.id, combo.reader.id);
 //                 if (exists) {
 //                     duplicateCount++;
@@ -776,14 +763,10 @@ module.exports = app;
 //                 if (result) {
 //                     successCount++;
 //                     const formattedDate = borrowDate.toLocaleDateString('vi-VN');
-//                     const formattedTime = borrowDate.toLocaleTimeString('vi-VN', { 
-//                         hour: '2-digit', 
-//                         minute: '2-digit' 
-//                     });
+//                     const formattedTime = borrowDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 //                     console.log(`[${successCount}] ${combo.reader.username} mượn ${combo.quantity} cuốn "${combo.book.title}" - ${formattedDate} ${formattedTime}`);
 //                 }
 
-//                 // Delay nhỏ để tránh spam database
 //                 if (i % 10 === 0) {
 //                     await new Promise(resolve => setTimeout(resolve, 50));
 //                 }
@@ -797,41 +780,21 @@ module.exports = app;
 //                 }
 //             }
 
-//             // Dừng khi đạt target
 //             if (successCount >= targetSuccessCount) {
 //                 console.log(`\nĐã đạt target ${targetSuccessCount} lượt mượn, dừng lại.`);
 //                 break;
 //             }
 //         }
 
-//         // Thống kê kết quả
 //         console.log(`\n${'='.repeat(50)}`);
-//         console.log(`KET QUA TAO DU LIEU MUON SACH`);
+//         console.log(`KẾT QUẢ`);
 //         console.log(`${'='.repeat(50)}`);
-//         console.log(`Thanh cong: ${successCount} luot muon`);
-//         console.log(`Trung lap: ${duplicateCount} luot`);
-//         console.log(`Loi khac: ${errorCount} luot`);
-//         console.log(`Tong cong: ${successCount + duplicateCount + errorCount} lan thu`);
-
-//         // Thống kê chi tiết
-//         const totalAttempts = successCount + duplicateCount + errorCount;
-//         console.log(`\n${'='.repeat(50)}`);
-//         console.log(`THONG KE CHI TIET`);
-//         console.log(`${'='.repeat(50)}`);
-//         console.log(`Ti le thanh cong: ${((successCount / totalAttempts) * 100).toFixed(1)}%`);
-//         console.log(`Ti le trung lap: ${((duplicateCount / totalAttempts) * 100).toFixed(1)}%`);
-//         console.log(`Trung binh moi sach: ~${(successCount / books.length).toFixed(1)} luot muon`);
-//         console.log(`Trung binh moi doc gia: ~${(successCount / readers.length).toFixed(1)} luot muon`);
-
-//         // Ước tính tổng số sách được mượn
-//         const estimatedTotalBooks = Math.round(successCount * 1.3);
-//         console.log(`Tong sach duoc muon (uoc tinh): ~${estimatedTotalBooks} cuon`);
-        
-//         // Thông tin về phân bố thời gian
-//         console.log(`Du lieu duoc phan bo deu trong 14 ngay qua`);
-//         console.log(`Gio muon: 8h00 - 17h00 (gio hanh chinh)`);
+//         console.log(`Thành công: ${successCount}`);
+//         console.log(`Trùng lặp: ${duplicateCount}`);
+//         console.log(`Lỗi khác: ${errorCount}`);
+//         console.log(`Tổng: ${successCount + duplicateCount + errorCount}`);
 
 //     } catch (err) {
-//         console.error("Loi chung khi chay script:", err.message);
+//         console.error("Lỗi chung khi chạy script:", err.message);
 //     }
 // })();

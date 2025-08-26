@@ -17,6 +17,12 @@ const TheoDoiMuonSachSchema = new mongoose.Schema({
     required: false,
     default: null
   },
+
+  NgayGhiNhanTra: {  
+    type: Date,
+    required: false,
+    default: null
+  },
   
   DaGiaHan: {
     type: Boolean,

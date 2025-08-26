@@ -299,6 +299,7 @@ async function getInfoLendBook(data) {
     const lendRecord = await TheoDoiMuonSach.findOne({
       MaSach,
       MaDocGia,
+      NgayGhiNhanTra,
       TrangThai: { $in: ['pending', 'approved', 'borrowing', 'returned', 'overdue'] }
     }).sort({ createdAt: -1 }); // Lấy record mới nhất
     return lendRecord;
@@ -363,6 +364,10 @@ async function updateBorrowStatus(requestId, adminId, status) {
       // Trừ số lượng sách
       sach.SoQuyen -= request.SoLuong;
       await sach.save();
+    }
+
+    if (status === 'returned') {
+      updateFields.NgayGhiNhanTra = new Date();
     }
 
     const updated = await TheoDoiMuonSach.findByIdAndUpdate(
