@@ -299,7 +299,6 @@ async function getInfoLendBook(data) {
     const lendRecord = await TheoDoiMuonSach.findOne({
       MaSach,
       MaDocGia,
-      NgayGhiNhanTra,
       TrangThai: { $in: ['pending', 'approved', 'borrowing', 'returned', 'overdue'] }
     }).sort({ createdAt: -1 }); // Lấy record mới nhất
     return lendRecord;
@@ -437,6 +436,71 @@ async function getBorrowBookOfUser(userId) {
   } catch (error) {
     console.error('Lỗi khi lấy sách đã mượn của user:', error);
     throw error;
+  }
+}
+
+async function countCurrentBorrowing(MaDocGia) {
+  try {
+    const result = await TheoDoiMuonSach.aggregate([
+      { 
+        $match: { 
+          MaDocGia: mongoose.Types.ObjectId(MaDocGia), 
+          TrangThai: { $in: ['approved', 'overdue'] } 
+        } 
+      },
+      { 
+        $group: { 
+          _id: null, 
+          totalSoLuong: { $sum: "$SoLuong" } 
+        } 
+      }
+    ]);
+
+    if (result && result.length > 0) {
+      return result[0].totalSoLuong;
+    } else {
+      return 0;
+    }
+  } catch (err) {
+    console.error("Lỗi khi đếm số sách đang mượn:", err);
+    throw err;
+  }
+}
+
+async function countCurrentBorrowingToday(MaDocGia) {
+  try {
+    // Lấy ngày hôm nay
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const result = await TheoDoiMuonSach.aggregate([
+      { 
+        $match: { 
+          MaDocGia: mongoose.Types.ObjectId(MaDocGia),
+          TrangThai: { $in: ['approved', 'overdue'] },
+          NgayMuon: { $gte: startOfDay, $lte: endOfDay } // chỉ tính hôm nay
+        } 
+      },
+      { 
+        $group: { 
+          _id: null, 
+          totalSoLuong: { $sum: "$SoLuong" } 
+        } 
+      }
+    ]);
+
+    if (result && result.length > 0) {
+      return result[0].totalSoLuong;
+    } else {
+      return 0;
+    }
+  } catch (err) {
+    console.error("Lỗi khi đếm số sách đang mượn hôm nay:", err);
+    throw err;
   }
 }
 
@@ -1315,5 +1379,7 @@ module.exports = {
   getTodayBook,
   getTopTenWeekBook,
   getTrendingBook,
-  getPopularBook
+  getPopularBook,
+  countCurrentBorrowing,
+  countCurrentBorrowingToday
 }

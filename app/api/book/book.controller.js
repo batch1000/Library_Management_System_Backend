@@ -298,6 +298,38 @@ async function getBorrowBookOfUser(req, res) {
     }
 }
 
+async function countCurrentBorrowing(req, res) {
+    try {
+        const { MaDocGia } = req.body;
+        if (!MaDocGia) {
+            return res.status(400).json({ message: "Thiếu MaDocGia" });
+        }
+
+        const count = await bookService.countCurrentBorrowing(MaDocGia);
+
+        res.json(count);
+    } catch (error) {
+        console.error("Lỗi khi đếm số sách đang mượn:", error);
+        res.status(500).send("Đếm số sách đang mượn thất bại");
+    }
+}
+
+async function countCurrentBorrowingToday(req, res) {
+    try {
+      const { MaDocGia } = req.body;
+      if (!MaDocGia) {
+        return res.status(400).json({ message: "Thiếu MaDocGia" });
+      }
+  
+      const count = await bookService.countCurrentBorrowingToday(MaDocGia);
+  
+      res.json(count);
+    } catch (error) {
+      console.error("Lỗi khi đếm số sách đang mượn:", error);
+      res.status(500).send("Đếm số sách đang mượn thất bại");
+    }
+  }
+
 async function addFavoriteBook(req, res) {
     try {
         const { MaSach, MaDocGia } = req.body;
@@ -536,7 +568,7 @@ async function getTrendingBook(req, res) {
         if (!result || result.length === 0) {
             return res.status(404).send("Không tìm thấy sách xu hướng.");
         }
-        
+
         res.json(result);
     } catch (error) {
         console.error("❌ Lỗi khi lấy sách xu hướng:", error);
@@ -604,5 +636,7 @@ module.exports = {
     getTopTenWeekBook,
     getTrendingBook,
     getPopularBook,
-    getPopularBookFilter
+    getPopularBookFilter,
+    countCurrentBorrowing,
+    countCurrentBorrowingToday
 };

@@ -31,7 +31,9 @@ const
         getTopTenWeekBook,
         getTrendingBook,
         getPopularBook,
-        getPopularBookFilter
+        getPopularBookFilter,
+        countCurrentBorrowing,
+        countCurrentBorrowingToday
     } = require('./book.controller')
 
 const router = express.Router()
@@ -51,6 +53,8 @@ router.post('/getInfoLendBook', getInfoLendBook);
 router.get('/getTrackBorrowBook', getTrackBorrowBook);
 router.post('/updateBorrowStatus', updateBorrowStatus);
 router.post('/extendBorrowTime', extendBorrowTime);
+router.post('/countCurrentBorrowing', countCurrentBorrowing);
+router.post('/countCurrentBorrowingToday', countCurrentBorrowingToday);
 
 router.get('/getBorrowBookOfUser/:id', getBorrowBookOfUser);
 
