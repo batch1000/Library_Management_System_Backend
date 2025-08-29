@@ -442,17 +442,17 @@ async function getBorrowBookOfUser(userId) {
 async function countCurrentBorrowing(MaDocGia) {
   try {
     const result = await TheoDoiMuonSach.aggregate([
-      { 
-        $match: { 
-          MaDocGia: mongoose.Types.ObjectId(MaDocGia), 
-          TrangThai: { $in: ['approved', 'overdue'] } 
-        } 
+      {
+        $match: {
+          MaDocGia: mongoose.Types.ObjectId(MaDocGia),
+          TrangThai: { $in: ['approved', 'overdue'] }
+        }
       },
-      { 
-        $group: { 
-          _id: null, 
-          totalSoLuong: { $sum: "$SoLuong" } 
-        } 
+      {
+        $group: {
+          _id: null,
+          totalSoLuong: { $sum: "$SoLuong" }
+        }
       }
     ]);
 
@@ -478,18 +478,18 @@ async function countCurrentBorrowingToday(MaDocGia) {
     endOfDay.setHours(23, 59, 59, 999);
 
     const result = await TheoDoiMuonSach.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           MaDocGia: mongoose.Types.ObjectId(MaDocGia),
           TrangThai: { $in: ['approved', 'overdue'] },
           NgayMuon: { $gte: startOfDay, $lte: endOfDay } // chỉ tính hôm nay
-        } 
+        }
       },
-      { 
-        $group: { 
-          _id: null, 
-          totalSoLuong: { $sum: "$SoLuong" } 
-        } 
+      {
+        $group: {
+          _id: null,
+          totalSoLuong: { $sum: "$SoLuong" }
+        }
       }
     ]);
 
@@ -502,6 +502,76 @@ async function countCurrentBorrowingToday(MaDocGia) {
     console.error("Lỗi khi đếm số sách đang mượn hôm nay:", err);
     throw err;
   }
+}
+
+async function countCurrentPending(MaDocGia) {
+  try {
+    const result = await TheoDoiMuonSach.aggregate([
+      {
+        $match: {
+          MaDocGia: mongoose.Types.ObjectId(MaDocGia),
+          TrangThai: 'pending'   // chỉ lấy pending
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalSoLuong: { $sum: "$SoLuong" }
+        }
+      }
+    ]);
+
+    if (result && result.length > 0) {
+      return result[0].totalSoLuong;
+    } else {
+      return 0;
+    }
+  } catch (err) {
+    console.error("Lỗi khi đếm số sách pending:", err);
+    throw err;
+  }
+}
+
+async function countCurrentPendingToDay(MaDocGia) {
+  try {
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const result = await TheoDoiMuonSach.aggregate([
+      {
+        $match: {
+          MaDocGia: mongoose.Types.ObjectId(MaDocGia),
+          TrangThai: 'pending',
+          createdAt: { $gte: startOfDay, $lte: endOfDay } // ✅ dùng createdAt
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalSoLuong: { $sum: "$SoLuong" }
+        }
+      }
+    ]);
+
+    return result.length > 0 ? result[0].totalSoLuong : 0;
+  } catch (err) {
+    console.error("Lỗi khi đếm số sách pending hôm nay:", err);
+    throw err;
+  }
+}
+
+async function deletePending(bookId, readerId) {
+  const result = await TheoDoiMuonSach.deleteOne({
+    MaSach: bookId,
+    MaDocGia: readerId,
+    TrangThai: 'pending'  
+  });
+
+  return result.deletedCount > 0;
 }
 
 async function addFavoriteBook(bookId, readerId) {
@@ -1113,11 +1183,11 @@ async function getTrendingBook(limit) {
         let trending_score = 0;
 
         // CÔNG THỨC MỚI: ANTI-POPULAR + FRESH DISCOVERY
-        
+
         // Bước 1: Lọc sách - chỉ xét sách chưa quá popular (total < 120)
         if (total_activity >= 120) {
           // console.log(`Loai sach qua popular - Book: ${bookIdStr}, total_activity: ${total_activity} >= 120`);
-        } 
+        }
         // Bước 2: Phải có hoạt động tối thiểu trong 7 ngày gần
         else if (recent_activity < 8) {
           // console.log(`Khong du hoat dong gan day - Book: ${bookIdStr}, recent_activity: ${recent_activity} < 8`);
@@ -1126,19 +1196,19 @@ async function getTrendingBook(limit) {
         else {
           // Freshness bonus: sách càng ít lịch sử càng được ưu tiên
           const freshness_bonus = Math.max(0.3, (120 - total_activity) / 120);
-          
+
           // Recent momentum: nhân đôi trọng số hoạt động gần đây
           const recent_momentum = recent_activity * 2;
-          
+
           // Growth factor: nếu có tăng trưởng thì bonus
           let growth_factor = 1.0;
           if (previous_activity > 0 && recent_activity > previous_activity) {
             growth_factor = 1 + Math.min((recent_activity - previous_activity) / previous_activity, 1.0);
           }
-          
+
           // Công thức cuối: Fresh Discovery Score
           trending_score = recent_momentum * freshness_bonus * growth_factor;
-          
+
           // console.log(`Fresh Discovery - Book: ${bookIdStr}, recent: ${recent_activity}, total: ${total_activity}, freshness_bonus: ${freshness_bonus.toFixed(2)}, growth_factor: ${growth_factor.toFixed(2)}, trending_score: ${trending_score.toFixed(3)}`);
         }
 
@@ -1381,5 +1451,8 @@ module.exports = {
   getTrendingBook,
   getPopularBook,
   countCurrentBorrowing,
-  countCurrentBorrowingToday
+  countCurrentBorrowingToday,
+  countCurrentPending,
+  countCurrentPendingToDay,
+  deletePending
 }

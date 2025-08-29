@@ -33,7 +33,10 @@ const
         getPopularBook,
         getPopularBookFilter,
         countCurrentBorrowing,
-        countCurrentBorrowingToday
+        countCurrentBorrowingToday,
+        countCurrentPending,
+        countCurrentPendingToDay,
+        deletePending
     } = require('./book.controller')
 
 const router = express.Router()
@@ -49,14 +52,16 @@ router.post('/addGenre', addGenre);
 router.get('/getAllGenre', getAllGenre);
 
 router.post('/lendBook', lendBook);
+router.get('/getBorrowBookOfUser/:id', getBorrowBookOfUser);
 router.post('/getInfoLendBook', getInfoLendBook);
 router.get('/getTrackBorrowBook', getTrackBorrowBook);
 router.post('/updateBorrowStatus', updateBorrowStatus);
 router.post('/extendBorrowTime', extendBorrowTime);
 router.post('/countCurrentBorrowing', countCurrentBorrowing);
 router.post('/countCurrentBorrowingToday', countCurrentBorrowingToday);
-
-router.get('/getBorrowBookOfUser/:id', getBorrowBookOfUser);
+router.post('/countCurrentPending', countCurrentPending);
+router.post('/countCurrentPendingToDay', countCurrentPendingToDay);
+router.delete('/deletePending', deletePending);
 
 router.post('/addFavoriteBook', addFavoriteBook);
 router.get('/getFavoriteBooks/:id', getFavoriteBooks);

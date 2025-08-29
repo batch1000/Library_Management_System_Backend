@@ -316,19 +316,68 @@ async function countCurrentBorrowing(req, res) {
 
 async function countCurrentBorrowingToday(req, res) {
     try {
-      const { MaDocGia } = req.body;
-      if (!MaDocGia) {
-        return res.status(400).json({ message: "Thiếu MaDocGia" });
-      }
-  
-      const count = await bookService.countCurrentBorrowingToday(MaDocGia);
-  
-      res.json(count);
+        const { MaDocGia } = req.body;
+        if (!MaDocGia) {
+            return res.status(400).json({ message: "Thiếu MaDocGia" });
+        }
+
+        const count = await bookService.countCurrentBorrowingToday(MaDocGia);
+
+        res.json(count);
     } catch (error) {
-      console.error("Lỗi khi đếm số sách đang mượn:", error);
-      res.status(500).send("Đếm số sách đang mượn thất bại");
+        console.error("Lỗi khi đếm số sách đang mượn:", error);
+        res.status(500).send("Đếm số sách đang mượn thất bại");
     }
-  }
+}
+
+async function countCurrentPending(req, res) {
+    try {
+        const { MaDocGia } = req.body;
+        if (!MaDocGia) {
+            return res.status(400).json({ message: "Thiếu MaDocGia" });
+        }
+
+        const count = await bookService.countCurrentPending(MaDocGia);
+
+        res.json(count);
+    } catch (error) {
+        console.error("Lỗi khi đếm số sách đang chờ duyệt:", error);
+        res.status(500).send("Đếm số sách đang chờ duyệt");
+    }
+}
+
+async function countCurrentPendingToDay(req, res) {
+    try {
+        const { MaDocGia } = req.body;
+        if (!MaDocGia) {
+            return res.status(400).json({ message: "Thiếu MaDocGia" });
+        }
+
+        const count = await bookService.countCurrentPendingToDay(MaDocGia);
+
+        res.json(count);
+    } catch (error) {
+        console.error("Lỗi khi đếm số sách đang chờ duyệt:", error);
+        res.status(500).send("Đếm số sách đang chờ duyệt");
+    }
+}
+
+async function deletePending(req, res) {
+    try {
+        const { MaSach, MaDocGia } = req.body;
+
+        if (!MaSach || !MaDocGia) {
+            return res.status(400).json({ message: "Thiếu MaSach hoặc MaDocGia" });
+        }
+
+        const result = await bookService.deletePending(MaSach, MaDocGia);
+
+        res.json(result);
+    } catch (error) {
+        console.error("Lỗi khi hủy đăng ký mượn sách:", error);
+        res.status(500).send("Hủy đăng ký mượn sách thất bại");
+    }
+}
 
 async function addFavoriteBook(req, res) {
     try {
@@ -638,5 +687,8 @@ module.exports = {
     getPopularBook,
     getPopularBookFilter,
     countCurrentBorrowing,
-    countCurrentBorrowingToday
+    countCurrentBorrowingToday,
+    countCurrentPending,
+    countCurrentPendingToDay,
+    deletePending
 };
