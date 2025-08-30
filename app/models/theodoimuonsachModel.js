@@ -41,6 +41,21 @@ const TheoDoiMuonSachSchema = new mongoose.Schema({
     default: 'pending'
   },
 
+  TinhTrangSach: {
+    type: String,
+    default: ''
+  },
+  
+  PhiBoiThuong: {
+    type: Number,
+    default: 0
+  },
+
+  PhiQuaHan: {
+    type: Number,
+    default: 0
+  },
+
   MaSach: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Sach',

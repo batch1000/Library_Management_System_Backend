@@ -376,12 +376,79 @@ async function updateBorrowStatus(requestId, adminId, status) {
     );
 
     return updated;
-
   } catch (err) {
     console.error('Lỗi khi cập nhật trạng thái mượn sách:', err);
     throw err;
   }
 }
+
+async function updateReturnStatus(requestId, adminId, status, bookCondition) {
+  try {
+  
+    const request = await TheoDoiMuonSach.findById(requestId);
+    if (!request) {
+      throw new Error("Không tìm thấy yêu cầu mượn");
+    }
+
+    const sach = await Sach.findById(request.MaSach);
+    if (!sach) {
+      throw new Error("Không tìm thấy sách");
+    }
+
+    let phiBoiThuong = 0;
+    let phiQuaHan = 0;
+
+    const now = new Date();
+
+    // ====== XỬ LÝ QUÁ HẠN ======
+    let soNgayTre = 0;
+    if (request.NgayTra && now > request.NgayTra) {
+      const diffMs = now - request.NgayTra;
+      soNgayTre = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      phiQuaHan = 5000 * soNgayTre * request.SoLuong;
+    }
+
+    // ====== XỬ LÝ TÌNH TRẠNG SÁCH ======
+    if (bookCondition === "Mất sách") {
+      phiBoiThuong = request.SoLuong * sach.DonGia * 1.3 + 50000;
+    } else if (bookCondition === "Hư sách") {
+      phiBoiThuong = request.SoLuong * sach.DonGia * 0.2;
+    }
+
+    // ====== CẬP NHẬT TRẠNG THÁI ======
+    const updateFields = {
+      TrangThai: status,
+      Msnv: adminId,
+      TinhTrangSach: bookCondition,
+      PhiBoiThuong: phiBoiThuong,
+      PhiQuaHan: phiQuaHan,
+    };
+
+    // Nếu không phải mất sách mới cập nhật NgayGhiNhanTra
+    if (bookCondition !== "Mất sách") {
+      updateFields.NgayGhiNhanTra = now;
+    }
+
+    // ====== CẬP NHẬT LẠI SỐ LƯỢNG SÁCH ======
+    // Nếu KHÔNG mất sách => cộng lại số lượng
+    if (bookCondition !== "Mất sách") {
+      sach.SoQuyen += request.SoLuong;
+      await sach.save();
+    }
+
+    const updated = await TheoDoiMuonSach.findByIdAndUpdate(
+      requestId,
+      updateFields,
+      { new: true }
+    );
+
+    return updated;
+  } catch (err) {
+    console.error("Lỗi khi cập nhật trạng thái trả sách:", err);
+    throw err;
+  }
+}
+
 
 async function extendBorrowTime(requestId, adminId, newDueDate) {
   try {
@@ -1454,5 +1521,6 @@ module.exports = {
   countCurrentBorrowingToday,
   countCurrentPending,
   countCurrentPendingToDay,
-  deletePending
+  deletePending,
+  updateReturnStatus
 }

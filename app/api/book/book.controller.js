@@ -256,18 +256,34 @@ async function getTrackBorrowBook(req, res) {
 
 async function updateBorrowStatus(req, res) {
     try {
-        const { requestId, adminId, status } = req.body;
+        const { requestId, adminId, status} = req.body;
 
         if (!requestId || !adminId || !status) {
             return res.status(400).send("Thiếu thông tin cần thiết");
         }
 
         const updated = await bookService.updateBorrowStatus(requestId, adminId, status);
-
         res.json(updated);
     } catch (error) {
         console.error('Lỗi khi cập nhật trạng thái mượn sách:', error);
         res.status(500).send('Cập nhật trạng thái mượn sách thất bại');
+    }
+}
+
+async function updateReturnStatus(req, res) {
+    try {
+        const { requestId, adminId, status, bookCondition} = req.body;
+
+        if (!requestId || !adminId || !status || !bookCondition) {
+            return res.status(400).send("Thiếu thông tin cần thiết");
+        }
+
+        const updated = await bookService.updateReturnStatus(requestId, adminId, status, bookCondition);
+        console.log(updated);
+        res.json(updated);
+    } catch (error) {
+        console.error('Lỗi khi cập nhật trạng thái trả sách:', error);
+        res.status(500).send('Cập nhật trạng thái trả sách thất bại');
     }
 }
 
@@ -690,5 +706,6 @@ module.exports = {
     countCurrentBorrowingToday,
     countCurrentPending,
     countCurrentPendingToDay,
-    deletePending
+    deletePending,
+    updateReturnStatus
 };

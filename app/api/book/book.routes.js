@@ -36,7 +36,8 @@ const
         countCurrentBorrowingToday,
         countCurrentPending,
         countCurrentPendingToDay,
-        deletePending
+        deletePending,
+        updateReturnStatus
     } = require('./book.controller')
 
 const router = express.Router()
@@ -56,6 +57,7 @@ router.get('/getBorrowBookOfUser/:id', getBorrowBookOfUser);
 router.post('/getInfoLendBook', getInfoLendBook);
 router.get('/getTrackBorrowBook', getTrackBorrowBook);
 router.post('/updateBorrowStatus', updateBorrowStatus);
+router.post('/updateReturnStatus', updateReturnStatus);
 router.post('/extendBorrowTime', extendBorrowTime);
 router.post('/countCurrentBorrowing', countCurrentBorrowing);
 router.post('/countCurrentBorrowingToday', countCurrentBorrowingToday);
