@@ -56,6 +56,16 @@ const TheoDoiMuonSachSchema = new mongoose.Schema({
     default: 0
   },
 
+  NgayGhiNhanQuaHan: {
+    type: Date,
+    default: null
+  }, 
+  
+  DaThanhToan: {
+    type: Boolean,
+    default: false
+  },
+
   MaSach: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Sach',

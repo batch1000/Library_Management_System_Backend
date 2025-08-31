@@ -11,6 +11,53 @@ app.use('/api/book', require('./app/api/book/book.routes'));
 
 module.exports = app;
 
+//Auto check
+const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel'); 
+
+(async () => {
+    try {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        // Lấy các record chưa thanh toán và quá hạn
+        const overdueRecords = await TheoDoiMuonSach.find({
+            DaThanhToan: false,
+            NgayTra: { $lt: now }
+        });
+
+        let updatedCount = 0;
+
+        for (const record of overdueRecords) {
+            if (!record.NgayTra) continue;
+
+            const lastUpdate = record.NgayGhiNhanQuaHan
+                ? new Date(record.NgayGhiNhanQuaHan.getFullYear(), record.NgayGhiNhanQuaHan.getMonth(), record.NgayGhiNhanQuaHan.getDate())
+                : null;
+
+            if (lastUpdate && lastUpdate.getTime() === today.getTime()) continue;
+
+            const daysLate = Math.max(
+                0,
+                Math.floor((now - record.NgayTra) / (1000 * 60 * 60 * 24))
+            );
+
+            record.PhiQuaHan = daysLate * 5000;
+            record.NgayGhiNhanQuaHan = now;
+
+            await record.save();
+            updatedCount++;
+        }
+
+        if(updatedCount > 0) {
+            console.log(`✅ Cập nhật phí quá hạn xong, tổng: ${updatedCount} record`);
+        } else {
+            console.log('Hôm nay đã cập nhật phí quá hạn rồi');
+        }
+        
+    } catch (err) {
+        console.error("❌ Lỗi cập nhật phí quá hạn:", err.message);
+    }
+})();
 
 // const DocGia = require('./app/models/docgiaModel'); // chỉnh lại đường dẫn nếu khác
 // (async () => {

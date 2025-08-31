@@ -256,7 +256,7 @@ async function getTrackBorrowBook(req, res) {
 
 async function updateBorrowStatus(req, res) {
     try {
-        const { requestId, adminId, status} = req.body;
+        const { requestId, adminId, status } = req.body;
 
         if (!requestId || !adminId || !status) {
             return res.status(400).send("Thiếu thông tin cần thiết");
@@ -272,18 +272,54 @@ async function updateBorrowStatus(req, res) {
 
 async function updateReturnStatus(req, res) {
     try {
-        const { requestId, adminId, status, bookCondition} = req.body;
+        const { requestId, adminId, status, bookCondition } = req.body;
 
         if (!requestId || !adminId || !status || !bookCondition) {
             return res.status(400).send("Thiếu thông tin cần thiết");
         }
 
         const updated = await bookService.updateReturnStatus(requestId, adminId, status, bookCondition);
-        console.log(updated);
+
         res.json(updated);
     } catch (error) {
         console.error('Lỗi khi cập nhật trạng thái trả sách:', error);
         res.status(500).send('Cập nhật trạng thái trả sách thất bại');
+    }
+}
+
+async function confirmPaidCompensation(req, res) {
+    try {
+        const { requestId } = req.body;
+
+        if (!requestId) {
+            return res.status(400).send("Thiếu thông tin cần thiết");
+        }
+
+        const updated = await bookService.confirmPaidCompensation(requestId);
+
+        res.json(updated);
+    } catch (error) {
+        console.error('Lỗi khi cập nhật trạng thái thanh toán:', error);
+        res.status(500).send('Cập nhật trạng thái thanh toán thất bại');
+    }
+}
+
+async function updateOverdueFee(req, res) {
+    try {
+        const { requestId } = req.body;
+        if (!requestId) {
+            return res.status(400).json({ error: "Thiếu requestId" });
+        }
+
+        const updated = await bookService.updateOverdueFee(requestId);
+        if (!updated) {
+            return res.status(404).json({ error: "Không tìm thấy record" });
+        }
+
+        res.json(updated);
+    } catch (error) {
+        console.error("Lỗi khi cập nhật phí quá hạn:", error);
+        res.status(500).send("Cập nhật phí quá hạn thất bại");
     }
 }
 
@@ -707,5 +743,7 @@ module.exports = {
     countCurrentPending,
     countCurrentPendingToDay,
     deletePending,
-    updateReturnStatus
+    updateReturnStatus,
+    confirmPaidCompensation,
+    updateOverdueFee
 };

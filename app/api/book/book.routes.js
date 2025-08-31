@@ -37,7 +37,9 @@ const
         countCurrentPending,
         countCurrentPendingToDay,
         deletePending,
-        updateReturnStatus
+        updateReturnStatus,
+        confirmPaidCompensation,
+        updateOverdueFee
     } = require('./book.controller')
 
 const router = express.Router()
@@ -58,6 +60,8 @@ router.post('/getInfoLendBook', getInfoLendBook);
 router.get('/getTrackBorrowBook', getTrackBorrowBook);
 router.post('/updateBorrowStatus', updateBorrowStatus);
 router.post('/updateReturnStatus', updateReturnStatus);
+router.post('/confirmPaidCompensation', confirmPaidCompensation);
+router.post('/updateOverdueFee', updateOverdueFee);
 router.post('/extendBorrowTime', extendBorrowTime);
 router.post('/countCurrentBorrowing', countCurrentBorrowing);
 router.post('/countCurrentBorrowingToday', countCurrentBorrowingToday);

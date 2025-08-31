@@ -334,10 +334,11 @@ async function getTrackBorrowBook() {
 
 async function updateBorrowStatus(requestId, adminId, status) {
   try {
-    const updateFields = {
-      TrangThai: status,
-      Msnv: adminId
-    };
+    const updateFields = { TrangThai: status };
+
+    if (status !== 'overdue') {
+      updateFields.Msnv = adminId;
+    }
 
     if (status === 'approved') {
       const now = new Date();
@@ -382,9 +383,31 @@ async function updateBorrowStatus(requestId, adminId, status) {
   }
 }
 
+async function updateOverdueFee(requestId) {
+  const record = await TheoDoiMuonSach.findById(requestId);
+  if (!record) return null;
+
+  if (record.TrangThai !== "overdue" || record.DaThanhToan) {
+    return record; // không cần cập nhật
+  }
+
+  if (!record.NgayTra) return record; // chưa có hạn trả thì bỏ qua
+
+  const now = new Date();
+  const daysLate = Math.max(
+    0,
+    Math.floor((now - record.NgayTra) / (1000 * 60 * 60 * 24))
+  );
+
+  const penalty = daysLate * 5000; // mỗi ngày 5k
+  record.PhiQuaHan = penalty;
+
+  await record.save();
+}
+
 async function updateReturnStatus(requestId, adminId, status, bookCondition) {
   try {
-  
+
     const request = await TheoDoiMuonSach.findById(requestId);
     if (!request) {
       throw new Error("Không tìm thấy yêu cầu mượn");
@@ -396,17 +419,7 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
     }
 
     let phiBoiThuong = 0;
-    let phiQuaHan = 0;
-
     const now = new Date();
-
-    // ====== XỬ LÝ QUÁ HẠN ======
-    let soNgayTre = 0;
-    if (request.NgayTra && now > request.NgayTra) {
-      const diffMs = now - request.NgayTra;
-      soNgayTre = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      phiQuaHan = 5000 * soNgayTre * request.SoLuong;
-    }
 
     // ====== XỬ LÝ TÌNH TRẠNG SÁCH ======
     if (bookCondition === "Mất sách") {
@@ -421,7 +434,6 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
       Msnv: adminId,
       TinhTrangSach: bookCondition,
       PhiBoiThuong: phiBoiThuong,
-      PhiQuaHan: phiQuaHan,
     };
 
     // Nếu không phải mất sách mới cập nhật NgayGhiNhanTra
@@ -449,6 +461,24 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
   }
 }
 
+async function confirmPaidCompensation(requestId) {
+  try {
+    const updated = await TheoDoiMuonSach.findByIdAndUpdate(
+      requestId,
+      { DaThanhToan: true },
+      { new: true }
+    );
+
+    if (!updated) {
+      throw new Error("Không tìm thấy bản ghi mượn sách");
+    }
+
+    return updated;
+  } catch (err) {
+    console.error("Lỗi khi cập nhật trạng thái thanh toán:", err);
+    throw err;
+  }
+}
 
 async function extendBorrowTime(requestId, adminId, newDueDate) {
   try {
@@ -635,7 +665,7 @@ async function deletePending(bookId, readerId) {
   const result = await TheoDoiMuonSach.deleteOne({
     MaSach: bookId,
     MaDocGia: readerId,
-    TrangThai: 'pending'  
+    TrangThai: 'pending'
   });
 
   return result.deletedCount > 0;
@@ -1522,5 +1552,7 @@ module.exports = {
   countCurrentPending,
   countCurrentPendingToDay,
   deletePending,
-  updateReturnStatus
+  updateReturnStatus,
+  confirmPaidCompensation,
+  updateOverdueFee
 }
