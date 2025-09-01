@@ -407,21 +407,25 @@ async function updateOverdueFee(requestId) {
 
 async function updateReturnStatus(requestId, adminId, status, bookCondition) {
   try {
-
     const request = await TheoDoiMuonSach.findById(requestId);
-    if (!request) {
-      throw new Error("Không tìm thấy yêu cầu mượn");
-    }
+    if (!request) throw new Error("Không tìm thấy yêu cầu mượn");
 
     const sach = await Sach.findById(request.MaSach);
-    if (!sach) {
-      throw new Error("Không tìm thấy sách");
+    if (!sach) throw new Error("Không tìm thấy sách");
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // ====== TÍNH PHÍ QUÁ HẠN ======
+    let phiQuaHan = 0;
+    if (request.NgayTra && request.NgayTra < today) {
+      const dueDate = new Date(request.NgayTra.getFullYear(), request.NgayTra.getMonth(), request.NgayTra.getDate());
+      const daysLate = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+      phiQuaHan = daysLate * 5000 * request.SoLuong;
     }
 
-    let phiBoiThuong = 0;
-    const now = new Date();
-
     // ====== XỬ LÝ TÌNH TRẠNG SÁCH ======
+    let phiBoiThuong = 0;
     if (bookCondition === "Mất sách") {
       phiBoiThuong = request.SoLuong * sach.DonGia * 1.3 + 50000;
     } else if (bookCondition === "Hư sách") {
@@ -434,16 +438,16 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
       Msnv: adminId,
       TinhTrangSach: bookCondition,
       PhiBoiThuong: phiBoiThuong,
+      PhiQuaHan: phiQuaHan,
+      NgayCapNhatTinhTrangSach: now
     };
 
-    // Nếu không phải mất sách mới cập nhật NgayGhiNhanTra
-    if (bookCondition !== "Mất sách") {
-      updateFields.NgayGhiNhanTra = now;
+    if (phiQuaHan > 0 || phiBoiThuong > 0) {
+      updateFields.DaThanhToan = false;
     }
 
-    // ====== CẬP NHẬT LẠI SỐ LƯỢNG SÁCH ======
-    // Nếu KHÔNG mất sách => cộng lại số lượng
     if (bookCondition !== "Mất sách") {
+      updateFields.NgayGhiNhanTra = now;
       sach.SoQuyen += request.SoLuong;
       await sach.save();
     }

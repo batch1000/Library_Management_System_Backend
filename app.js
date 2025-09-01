@@ -14,10 +14,14 @@ module.exports = app;
 //Auto check
 const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel'); 
 
+function normalizeDate(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 (async () => {
     try {
         const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const today = normalizeDate(now);
 
         // Lấy các record chưa thanh toán và quá hạn
         const overdueRecords = await TheoDoiMuonSach.find({
@@ -30,30 +34,34 @@ const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel');
         for (const record of overdueRecords) {
             if (!record.NgayTra) continue;
 
+            const dueDate = normalizeDate(record.NgayTra);
+
             const lastUpdate = record.NgayGhiNhanQuaHan
-                ? new Date(record.NgayGhiNhanQuaHan.getFullYear(), record.NgayGhiNhanQuaHan.getMonth(), record.NgayGhiNhanQuaHan.getDate())
+                ? normalizeDate(record.NgayGhiNhanQuaHan)
                 : null;
 
+            // Nếu hôm nay đã cập nhật rồi thì bỏ qua
             if (lastUpdate && lastUpdate.getTime() === today.getTime()) continue;
 
+            // Tính số ngày trễ
             const daysLate = Math.max(
                 0,
-                Math.floor((now - record.NgayTra) / (1000 * 60 * 60 * 24))
+                Math.floor((today - dueDate) / (1000 * 60 * 60 * 24))
             );
 
-            record.PhiQuaHan = daysLate * 5000;
+            record.PhiQuaHan = daysLate * 5000 * record.SoLuong;
             record.NgayGhiNhanQuaHan = now;
 
             await record.save();
             updatedCount++;
         }
 
-        if(updatedCount > 0) {
+        if (updatedCount > 0) {
             console.log(`✅ Cập nhật phí quá hạn xong, tổng: ${updatedCount} record`);
         } else {
             console.log('Hôm nay đã cập nhật phí quá hạn rồi');
         }
-        
+
     } catch (err) {
         console.error("❌ Lỗi cập nhật phí quá hạn:", err.message);
     }

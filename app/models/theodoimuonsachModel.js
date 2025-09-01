@@ -46,6 +46,11 @@ const TheoDoiMuonSachSchema = new mongoose.Schema({
     default: ''
   },
   
+  NgayCapNhatTinhTrangSach: { 
+    type: Date, 
+    default: null 
+  },
+
   PhiBoiThuong: {
     type: Number,
     default: 0
