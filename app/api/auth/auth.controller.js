@@ -19,4 +19,13 @@ async function login(req, res) {
   }
 }
 
-module.exports = { login, signup };
+async function updateStatusAccount(req, res) {
+  try {
+    const result = await authService.updateStatusAccount(req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(500).send('Cập nhật trạng thái thất bại');
+  }
+}
+
+module.exports = { login, signup, updateStatusAccount };

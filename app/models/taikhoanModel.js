@@ -11,6 +11,13 @@ const TaiKhoanSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+
+    status: {
+        type: String,
+        enum: ['active', 'suspended', 'banned'],
+        default: 'active'
+    },
+
     MaDocGia: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DocGia',

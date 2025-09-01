@@ -3,37 +3,7 @@ const bcrypt = require('bcryptjs');
 const TaiKhoan = require('../../models/taikhoanModel');
 const DocGia = require('../../models/docgiaModel');
 const NhanVien = require('../../models/nhanvienModel');
-
-async function login(data) {
-  const { username, password } = data;
-
-  let user = await TaiKhoan.findOne({ username }).populate('MaDocGia');
-  if (user) {
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return null;
-
-    return {
-      _id: user.MaDocGia._id,
-      role: "User",
-      hoTen: `${user.MaDocGia.HoLot} ${user.MaDocGia.Ten}`
-    };
-  }
-
-  const nv = await NhanVien.findOne({ Username: username });
-  if (nv) {
-    const isMatch = await bcrypt.compare(password, nv.Password);
-    if (!isMatch) return null;
-
-    return {
-      _id: nv._id,
-      role: "Admin",
-      hoTen: nv.HoTenNV
-    };
-  }
-
-  return null;
-}
-
+const TheoDoiMuonSach = require('../../models/theodoimuonsachModel');
 
 async function generateMaDocGia() {
   const latestDocGia = await DocGia.findOne().sort({ createdAt: -1 }).exec();
@@ -47,7 +17,7 @@ async function generateMaDocGia() {
   }
 
   return nextNumber < 10000
-    ? `DG${nextNumber.toString().padStart(4, '0')}` 
+    ? `DG${nextNumber.toString().padStart(4, '0')}`
     : `DG${nextNumber}`;
 }
 
@@ -83,4 +53,63 @@ async function signup(data) {
   }
 }
 
-module.exports = { login, signup };
+async function login(data) {
+  const { username, password } = data;
+
+  let user = await TaiKhoan.findOne({ username }).populate('MaDocGia');
+  if (user) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return null;
+
+    return {
+      _id: user.MaDocGia._id,
+      role: "User",
+      hoTen: `${user.MaDocGia.HoLot} ${user.MaDocGia.Ten}`
+    };
+  }
+
+  const nv = await NhanVien.findOne({ Username: username });
+  if (nv) {
+    const isMatch = await bcrypt.compare(password, nv.Password);
+    if (!isMatch) return null;
+
+    return {
+      _id: nv._id,
+      role: "Admin",
+      hoTen: nv.HoTenNV
+    };
+  }
+
+  return null;
+}
+
+async function updateStatusAccount(data) {
+  const { maDocGia } = data; // nhận vào id độc giả
+
+  // Lấy tất cả bản ghi mượn sách của độc giả
+  const records = await TheoDoiMuonSach.find({ MaDocGia: maDocGia });
+
+  // Kiểm tra xem còn nợ phí hay không
+  let conNo = records.some(r => {
+    const tongPhi = (r.PhiQuaHan || 0) + (r.PhiBoiThuong || 0);
+    return !r.DaThanhToan && tongPhi > 0;
+  });
+
+  const newStatus = conNo ? 'suspended' : 'active';
+
+  // Cập nhật status của tài khoản
+  const updated = await TaiKhoan.findOneAndUpdate(
+    { MaDocGia: maDocGia },
+    { status: newStatus },
+    { new: true }
+  ).populate('MaDocGia');
+
+  if (!updated) {
+    throw new Error("Không tìm thấy tài khoản để cập nhật");
+  }
+
+  return updated;
+}
+
+
+module.exports = { login, signup, updateStatusAccount };

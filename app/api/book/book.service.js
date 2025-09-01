@@ -469,7 +469,9 @@ async function confirmPaidCompensation(requestId) {
   try {
     const updated = await TheoDoiMuonSach.findByIdAndUpdate(
       requestId,
-      { DaThanhToan: true },
+      { DaThanhToan: true,
+        NgayGhiNhanThanhToan: new Date() 
+      },
       { new: true }
     );
 
