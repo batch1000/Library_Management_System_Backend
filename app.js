@@ -34,7 +34,9 @@ function normalizeDate(date) {
         for (const record of overdueRecords) {
             if (!record.NgayTra) continue;
 
-            const dueDate = normalizeDate(record.NgayTra);
+            // ✅ tính hạn trả đến cuối ngày
+            const dueDate = normalizeDate(new Date(record.NgayTra));
+            dueDate.setDate(dueDate.getDate() + 1);
 
             const lastUpdate = record.NgayGhiNhanQuaHan
                 ? normalizeDate(record.NgayGhiNhanQuaHan)
@@ -43,10 +45,10 @@ function normalizeDate(date) {
             // Nếu hôm nay đã cập nhật rồi thì bỏ qua
             if (lastUpdate && lastUpdate.getTime() === today.getTime()) continue;
 
-            // Tính số ngày trễ
+            // ✅ Tính số ngày trễ
             const daysLate = Math.max(
                 0,
-                Math.floor((today - dueDate) / (1000 * 60 * 60 * 24))
+                Math.floor((today - dueDate) / (1000 * 60 * 60 * 24)) + 1
             );
 
             record.PhiQuaHan = daysLate * 5000 * record.SoLuong;
@@ -66,6 +68,8 @@ function normalizeDate(date) {
         console.error("❌ Lỗi cập nhật phí quá hạn:", err.message);
     }
 })();
+
+
 
 // const DocGia = require('./app/models/docgiaModel'); // chỉnh lại đường dẫn nếu khác
 // (async () => {

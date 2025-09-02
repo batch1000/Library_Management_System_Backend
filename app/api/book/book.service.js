@@ -419,10 +419,17 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
     // ====== TÍNH PHÍ QUÁ HẠN ======
     let phiQuaHan = 0;
     if (request.NgayTra && request.NgayTra < today) {
-      const dueDate = new Date(request.NgayTra.getFullYear(), request.NgayTra.getMonth(), request.NgayTra.getDate());
-      const daysLate = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+      const dueDate = new Date(request.NgayTra);
+      dueDate.setHours(23, 59, 59, 999);
+
+      const daysLate = Math.max(
+        0,
+        Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24))
+      );
+
       phiQuaHan = daysLate * 5000 * request.SoLuong;
     }
+
 
     // ====== XỬ LÝ TÌNH TRẠNG SÁCH ======
     let phiBoiThuong = 0;
@@ -469,8 +476,9 @@ async function confirmPaidCompensation(requestId) {
   try {
     const updated = await TheoDoiMuonSach.findByIdAndUpdate(
       requestId,
-      { DaThanhToan: true,
-        NgayGhiNhanThanhToan: new Date() 
+      {
+        DaThanhToan: true,
+        NgayGhiNhanThanhToan: new Date()
       },
       { new: true }
     );
