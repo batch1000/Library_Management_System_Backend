@@ -6,70 +6,115 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/auth', require('./app/api/auth/auth.routes'));
-app.use('/api/book', require('./app/api/book/book.routes'));
+app.use("/api/auth", require("./app/api/auth/auth.routes"));
+app.use("/api/book", require("./app/api/book/book.routes"));
+app.use("/api/library", require("./app/api/library/library.routes"));
 
 module.exports = app;
 
-//Auto check
-const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel'); 
+//Auto check Phí quá hạn
+// const TheoDoiMuonSach = require("./app/models/theodoimuonsachModel");
+
+// function normalizeDate(date) {
+//   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+// }
+
+// (async () => {
+//   try {
+//     const now = new Date();
+//     const today = normalizeDate(now);
+
+//     // Lấy các record chưa thanh toán và quá hạn
+//     const overdueRecords = await TheoDoiMuonSach.find({
+//       DaThanhToan: false,
+//       NgayTra: { $lt: now },
+//     });
+
+//     let updatedCount = 0;
+
+//     for (const record of overdueRecords) {
+//       if (!record.NgayTra) continue;
+
+//       // ✅ tính hạn trả đến cuối ngày
+//       const dueDate = normalizeDate(new Date(record.NgayTra));
+//       dueDate.setDate(dueDate.getDate() + 1);
+
+//       const lastUpdate = record.NgayGhiNhanQuaHan
+//         ? normalizeDate(record.NgayGhiNhanQuaHan)
+//         : null;
+
+//       // Nếu hôm nay đã cập nhật rồi thì bỏ qua
+//       if (lastUpdate && lastUpdate.getTime() === today.getTime()) continue;
+
+//       // ✅ Tính số ngày trễ
+//       const daysLate = Math.max(
+//         0,
+//         Math.floor((today - dueDate) / (1000 * 60 * 60 * 24)) + 1
+//       );
+
+//       record.PhiQuaHan = daysLate * 5000 * record.SoLuong;
+//       record.NgayGhiNhanQuaHan = now;
+
+//       await record.save();
+//       updatedCount++;
+//     }
+
+//     if (updatedCount > 0) {
+//       console.log(`✅ Cập nhật phí quá hạn xong, tổng: ${updatedCount} record`);
+//     } else {
+//       console.log("Hôm nay đã cập nhật phí quá hạn rồi");
+//     }
+//   } catch (err) {
+//     console.error("❌ Lỗi cập nhật phí quá hạn:", err.message);
+//   }
+// })();
+
+// Auto check hạn của thẻ thư viện
+const TheThuVien = require("./app/models/thethuvienModel");
+const ThongTinGiaHan = require("./app/models/thongtingiahanModel");
 
 function normalizeDate(date) {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 (async () => {
-    try {
-        const now = new Date();
-        const today = normalizeDate(now);
+  try {
+    const now = new Date();
+    const today = normalizeDate(now);
 
-        // Lấy các record chưa thanh toán và quá hạn
-        const overdueRecords = await TheoDoiMuonSach.find({
-            DaThanhToan: false,
-            NgayTra: { $lt: now }
-        });
+    // Lấy các thẻ đang hoạt động, hết hạn nhưng chưa được check hôm nay
+    const expiredCards = await TheThuVien.find({
+      TrangThai: "Hoạt động",
+      NgayHetHan: { $lt: now },
+      $or: [{ NgayKiemTraHetHan: null }, { NgayKiemTraHetHan: { $lt: today } }],
+    });
 
-        let updatedCount = 0;
+    let updatedCount = 0;
 
-        for (const record of overdueRecords) {
-            if (!record.NgayTra) continue;
+    for (const card of expiredCards) {
+      card.TrangThai = "Hết hạn";
+      card.NgayKiemTraHetHan = now; // ghi lại ngày đã check
+      await card.save();
 
-            // ✅ tính hạn trả đến cuối ngày
-            const dueDate = normalizeDate(new Date(record.NgayTra));
-            dueDate.setDate(dueDate.getDate() + 1);
+      await ThongTinGiaHan.create({
+        MaThe: card._id,
+        PhiGiaHan: 25000, // giả sử phí cố định
+      });
 
-            const lastUpdate = record.NgayGhiNhanQuaHan
-                ? normalizeDate(record.NgayGhiNhanQuaHan)
-                : null;
-
-            // Nếu hôm nay đã cập nhật rồi thì bỏ qua
-            if (lastUpdate && lastUpdate.getTime() === today.getTime()) continue;
-
-            // ✅ Tính số ngày trễ
-            const daysLate = Math.max(
-                0,
-                Math.floor((today - dueDate) / (1000 * 60 * 60 * 24)) + 1
-            );
-
-            record.PhiQuaHan = daysLate * 5000 * record.SoLuong;
-            record.NgayGhiNhanQuaHan = now;
-
-            await record.save();
-            updatedCount++;
-        }
-
-        if (updatedCount > 0) {
-            console.log(`✅ Cập nhật phí quá hạn xong, tổng: ${updatedCount} record`);
-        } else {
-            console.log('Hôm nay đã cập nhật phí quá hạn rồi');
-        }
-
-    } catch (err) {
-        console.error("❌ Lỗi cập nhật phí quá hạn:", err.message);
+      updatedCount++;
     }
+
+    if (updatedCount > 0) {
+      console.log(
+        `✅ Đã cập nhật trạng thái "Hết hạn" cho ${updatedCount} thẻ`
+      );
+    } else {
+      console.log("Hôm nay đã kiểm tra thẻ hết hạn rồi");
+    }
+  } catch (err) {
+    console.error("❌ Lỗi khi kiểm tra thẻ hết hạn:", err.message);
+  }
 })();
-
-
 
 // const DocGia = require('./app/models/docgiaModel'); // chỉnh lại đường dẫn nếu khác
 // (async () => {
@@ -87,6 +132,87 @@ function normalizeDate(date) {
 //     }
 // })();
 
+// const DocGia = require('./app/models/docgiaModel'); // chỉnh lại đường dẫn nếu khác
+
+// (async () => {
+//     try {
+//         const readers = await DocGia.find();
+
+//         console.log(`📌 Tổng số độc giả: ${readers.length}`);
+//         readers.forEach((dg, i) => {
+//             console.log(
+// `${i + 1}. _id: ${dg._id} | MaDocGia: ${dg.MaDocGia} | Họ tên: ${dg.HoLot} ${dg.Ten} | Ngày sinh: ${dg.NgaySinh ? dg.NgaySinh.toISOString().split('T')[0] : ''} | Phái: ${dg.Phai} | Địa chỉ: ${dg.DiaChi} | Điện thoại: ${dg.DienThoai} | Đối tượng: ${dg.DoiTuong} | createdAt: ${dg.createdAt} | updatedAt: ${dg.updatedAt}`
+//             );
+//         });
+//     } catch (err) {
+//         console.error("❌ Lỗi:", err.message);
+//     }
+// })();
+
+// const libraryService = require('./app/api/library/library.service');
+
+// const SinhVien = require('./app/models/sinhvienModel');
+// const NienKhoa = require('./app/models/nienkhoaModel');
+// const NganhHoc = require('./app/models/nganhhocModel');
+// const Khoa = require('./app/models/khoaModel');
+// const Lop = require('./app/models/lopModel');
+
+// (async () => {
+//     const test = [
+//         {
+//             "MaSinhVien": "B2115409",
+//             "Lop": "KTKT2A",
+//             "HeDaoTao": "Chính quy",
+//             "NienKhoa": "Khóa 46",
+//             "NamHoc": "2020-2024",
+//             "NganhHoc": "Kế toán",
+//             "Khoa": "Kinh tế",
+//             "DocGia": "689f390b0ba6ed16dcf4763f"  // DG0011
+//         }
+//     ]
+
+//   try {
+//     for (const item of test) {
+//       // 1. Tìm hoặc tạo Khoa
+//       let khoa = await Khoa.findOne({ TenKhoa: item.Khoa });
+//       if (!khoa) khoa = await Khoa.create({ TenKhoa: item.Khoa });
+
+//       // 2. Tìm hoặc tạo NganhHoc
+//       let nganh = await NganhHoc.findOne({ TenNganh: item.NganhHoc, Khoa: khoa._id });
+//       if (!nganh) nganh = await NganhHoc.create({ TenNganh: item.NganhHoc, Khoa: khoa._id });
+
+//       // 3. Tìm hoặc tạo NienKhoa
+//       let nk = await NienKhoa.findOne({ TenNienKhoa: item.NienKhoa });
+//       if (!nk) {
+//         // tạm lấy năm từ NamHoc
+//         const [namBatDau, namKetThuc] = item.NamHoc.split('-').map(n => parseInt(n));
+//         nk = await NienKhoa.create({ TenNienKhoa: item.NienKhoa, NamBatDau: namBatDau, NamKetThuc: namKetThuc });
+//       }
+
+//       // 4. Tìm hoặc tạo Lop
+//       let lop = await Lop.findOne({ TenLop: item.Lop });
+//       if (!lop) lop = await Lop.create({ TenLop: item.Lop });
+
+//       // 5. Tạo SinhVien
+//       await SinhVien.create({
+//         MaSinhVien: item.MaSinhVien,
+//         HeDaoTao: item.HeDaoTao,
+//         MaNienKhoa: nk._id,
+//         MaNganhHoc: nganh._id,
+//         MaDocGia: item.DocGia,   // ObjectId cũ
+//         MaLop: lop._id
+//       });
+
+//       console.log(`✅ Thêm sinh viên ${item.MaSinhVien} thành công!`);
+
+//       const card = await libraryService.createLibraryCard(item.DocGia);
+//       console.log(`📖 Đã tạo thẻ cho sinh viên ${item.MaSinhVien}:`, card.MaThe);
+//     }
+//   } catch (err) {
+//     console.error('❌ Lỗi:', err.message);
+//   }
+// })();
+
 // const Sach = require('./app/models/sachModel');
 // (async () => {
 //     try {
@@ -100,8 +226,6 @@ function normalizeDate(date) {
 //         console.error("❌ Lỗi:", err.message);
 //     }
 // })();
-
-
 
 //----------------------Rating Book 2 Weeks-------------------------
 // const DanhGiaSach = require('./app/models/danhgiasachModel');
@@ -268,9 +392,6 @@ function normalizeDate(date) {
 //   }
 // })();
 
-
-
-
 //----------------------Delete All Ratings-------------------------
 // const DanhGiaSach = require('./app/models/danhgiasachModel');
 
@@ -287,8 +408,6 @@ function normalizeDate(date) {
 // (async () => {
 //     await deleteAllRatings();
 // })();
-
-
 
 // //----------------------View Book-------------------------
 // const TheoDoiXemSach = require('./app/models/theodoixemsachModel');
@@ -385,16 +504,16 @@ function normalizeDate(date) {
 //     const now = new Date();
 //     const twoWeeksAgo = new Date();
 //     twoWeeksAgo.setDate(now.getDate() - 14);
-    
+
 //     const dates = [];
 //     const totalDays = 14;
-    
+
 //     const dayWeights = [];
 //     for (let day = 0; day < totalDays; day++) {
 //         const weight = Math.max(0.3, 1 - (day * 0.05));
 //         dayWeights.push(weight);
 //     }
-    
+
 //     const adjustWeightByDayOfWeek = (date, weight) => {
 //         const dayOfWeek = date.getDay();
 //         const weekdayMultiplier = {
@@ -403,18 +522,18 @@ function normalizeDate(date) {
 //         };
 //         return weight * weekdayMultiplier[dayOfWeek];
 //     };
-    
+
 //     for (let day = 0; day < totalDays; day++) {
 //         const currentDate = new Date(now);
 //         currentDate.setDate(now.getDate() - (totalDays - 1 - day));
-        
+
 //         let weight = dayWeights[day];
 //         weight = adjustWeightByDayOfWeek(currentDate, weight);
-        
+
 //         const baseCount = Math.floor(targetCount / totalDays * weight);
 //         const randomVariation = Math.floor(Math.random() * 4) - 1;
 //         const dayCount = Math.max(1, baseCount + randomVariation);
-        
+
 //         for (let i = 0; i < dayCount; i++) {
 //             const viewDate = new Date(currentDate);
 //             let hour;
@@ -430,18 +549,18 @@ function normalizeDate(date) {
 //             } else {
 //                 hour = 18 + Math.floor(Math.random() * 4);
 //             }
-            
+
 //             const minute = Math.floor(Math.random() * 60);
 //             viewDate.setHours(hour, minute, 0, 0);
 //             dates.push(viewDate);
 //         }
 //     }
-    
+
 //     for (let i = dates.length - 1; i > 0; i--) {
 //         const j = Math.floor(Math.random() * (i + 1));
 //         [dates[i], dates[j]] = [dates[j], dates[i]];
 //     }
-    
+
 //     return dates.slice(0, targetCount);
 // }
 
@@ -482,9 +601,9 @@ function normalizeDate(date) {
 //                 if (result) {
 //                     successCount++;
 //                     const daysAgo = Math.floor((new Date() - viewDate) / (1000 * 60 * 60 * 24));
-//                     const timeStr = viewDate.toLocaleTimeString('vi-VN', { 
-//                         hour: '2-digit', 
-//                         minute: '2-digit' 
+//                     const timeStr = viewDate.toLocaleTimeString('vi-VN', {
+//                         hour: '2-digit',
+//                         minute: '2-digit'
 //                     });
 //                     console.log(`[${successCount}] ${combo.reader.username} xem "${combo.book.title}" - ${daysAgo} ngay truoc luc ${timeStr}`);
 //                 }
@@ -534,8 +653,6 @@ function normalizeDate(date) {
 //     }
 // })();
 
-
-
 //----------------------Delete All Borrow Records-------------------------
 // const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel');
 
@@ -552,7 +669,6 @@ function normalizeDate(date) {
 // (async () => {
 //     await deleteAllBorrowRecords();
 // })();
-
 
 // // //----------------------Borrow Book with Duplicate Check-------------------------
 // const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel');

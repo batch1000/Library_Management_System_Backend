@@ -34,6 +34,11 @@ const DocGiaSchema = new mongoose.Schema({
     type: String,
     required: true,
     match: /^[0-9]{9,11}$/
+  },
+  DoiTuong: {
+    type: String,
+    enum: ['Sinh viên', 'Giảng viên', 'Khách'],
+    required: true
   }
 }, {
   timestamps: true
