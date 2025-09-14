@@ -1,15 +1,19 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const Sach = require('../../models/sachModel');
-const NhaXuatBan = require('../../models/nhaxuatbanModel');
-const TheLoaiSach = require('../../models/theloaisachModel');
-const TheoDoiMuonSach = require('../../models/theodoimuonsachModel')
-const YeuThichSach = require('../../models/yeuthichsachModel')
-const DanhGiaSach = require('../../models/danhgiasachModel');
+const Sach = require("../../models/sachModel");
+const NhaXuatBan = require("../../models/nhaxuatbanModel");
+const TheLoaiSach = require("../../models/theloaisachModel");
+const TheoDoiMuonSach = require("../../models/theodoimuonsachModel");
+const YeuThichSach = require("../../models/yeuthichsachModel");
+const DanhGiaSach = require("../../models/danhgiasachModel");
 const TheoDoiXemSach = require("../../models/theodoixemsachModel");
-const DocGia = require('../../models/docgiaModel')
+const QuyDinhPhatSach = require("../../models/quydinhphatsachModel");
+const QuyDinhMuonSach = require("../../models/quydinhmuonsachModel");
+const DocGia = require("../../models/docgiaModel");
 
-const { deleteImageFromCloudinary } = require('../../services/cloudinary.service');
+const {
+  deleteImageFromCloudinary,
+} = require("../../services/cloudinary.service");
 
 async function addGenre(genreName) {
   const existing = await TheLoaiSach.findOne({ TenTheLoai: genreName });
@@ -39,7 +43,7 @@ async function generateMaSach() {
   }
 
   return nextNumber < 10000
-    ? `S${nextNumber.toString().padStart(4, '0')}`
+    ? `S${nextNumber.toString().padStart(4, "0")}`
     : `S${nextNumber}`;
 }
 
@@ -55,20 +59,20 @@ async function generateMaNXB() {
   }
 
   return nextNumber < 10000
-    ? `NXB${nextNumber.toString().padStart(4, '0')}`
+    ? `NXB${nextNumber.toString().padStart(4, "0")}`
     : `NXB${nextNumber}`;
 }
 
 async function getAllBook() {
   try {
     const books = await Sach.find()
-      .populate('MaNXB', 'TenNXB DiaChi')
-      .populate('MaTheLoai', 'TenTheLoai')
+      .populate("MaNXB", "TenNXB DiaChi")
+      .populate("MaTheLoai", "TenTheLoai")
       .exec();
 
     return books;
   } catch (err) {
-    console.error('Lỗi khi truy vấn tất cả sách:', err);
+    console.error("Lỗi khi truy vấn tất cả sách:", err);
     throw err;
   }
 }
@@ -80,17 +84,17 @@ async function getOneBook(keyword) {
     if (/^S\d+$/i.test(keyword)) {
       query.MaSach = keyword.toUpperCase();
     } else {
-      query.TenSach = { $regex: `^${keyword}$`, $options: 'i' };
+      query.TenSach = { $regex: `^${keyword}$`, $options: "i" };
     }
 
     const book = await Sach.findOne(query)
-      .populate('MaNXB', 'TenNXB DiaChi')
-      .populate('MaTheLoai', 'TenTheLoai')
+      .populate("MaNXB", "TenNXB DiaChi")
+      .populate("MaTheLoai", "TenTheLoai")
       .exec();
 
     return book;
   } catch (err) {
-    console.error('Lỗi khi truy vấn một sách:', err);
+    console.error("Lỗi khi truy vấn một sách:", err);
     throw err;
   }
 }
@@ -98,13 +102,13 @@ async function getOneBook(keyword) {
 async function getBookById(id) {
   try {
     const book = await Sach.findById(id)
-      .populate('MaNXB', 'TenNXB DiaChi')
-      .populate('MaTheLoai', 'TenTheLoai')
+      .populate("MaNXB", "TenNXB DiaChi")
+      .populate("MaTheLoai", "TenTheLoai")
       .exec();
 
     return book;
   } catch (err) {
-    console.error('Lỗi khi truy vấn sách theo ID:', err);
+    console.error("Lỗi khi truy vấn sách theo ID:", err);
     throw err;
   }
 }
@@ -118,11 +122,13 @@ async function addBook(data) {
       nxb = await NhaXuatBan.create({
         MaNXB: maNXB,
         TenNXB: data.NhaXuatBan,
-        DiaChi: data.DiaChiNhaXuatBan
+        DiaChi: data.DiaChiNhaXuatBan,
       });
     }
 
-    const theLoai = await TheLoaiSach.findOne({ TenTheLoai: data.TheLoai }).exec();
+    const theLoai = await TheLoaiSach.findOne({
+      TenTheLoai: data.TheLoai,
+    }).exec();
     if (!theLoai) {
       throw new Error(`Thể loại "${data.TheLoai}" không tồn tại`);
     }
@@ -139,12 +145,12 @@ async function addBook(data) {
       MoTaSach: data.MoTaSach,
       Image: data.Image,
       MaNXB: nxb._id,
-      MaTheLoai: theLoai._id
+      MaTheLoai: theLoai._id,
     });
 
     return newBook;
   } catch (err) {
-    console.error('Lỗi khi thêm sách:', err);
+    console.error("Lỗi khi thêm sách:", err);
     throw err;
   }
 }
@@ -161,7 +167,7 @@ async function updateBook(id, data) {
         nxb = await NhaXuatBan.create({
           MaNXB: maNXB,
           TenNXB: data.TenNXB,
-          DiaChi: data.DiaChiNXB || ""
+          DiaChi: data.DiaChiNXB || "",
         });
       } else if (data.DiaChiNXB) {
         nxb.DiaChi = data.DiaChiNXB;
@@ -172,7 +178,9 @@ async function updateBook(id, data) {
     }
 
     if (data.TenTheLoai) {
-      const theLoai = await TheLoaiSach.findOne({ TenTheLoai: data.TenTheLoai }).exec();
+      const theLoai = await TheLoaiSach.findOne({
+        TenTheLoai: data.TenTheLoai,
+      }).exec();
       if (!theLoai) {
         throw new Error(`Thể loại "${data.TenTheLoai}" không tồn tại`);
       }
@@ -187,56 +195,58 @@ async function updateBook(id, data) {
     if (data.MoTaSach) updateData.MoTaSach = data.MoTaSach;
     if (data.Image) updateData.Image = data.Image;
 
-    const updatedBook = await Sach.findByIdAndUpdate(id, updateData, { new: true });
+    const updatedBook = await Sach.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
 
     return updatedBook;
   } catch (err) {
-    console.error('Lỗi khi cập nhật sách:', err);
+    console.error("Lỗi khi cập nhật sách:", err);
     throw err;
   }
 }
 
 function extractPublicIdFromUrl(imageUrl) {
   try {
-    console.log('Đang trích xuất publicId từ URL:', imageUrl);
+    console.log("Đang trích xuất publicId từ URL:", imageUrl);
 
-    if (!imageUrl || !imageUrl.includes('cloudinary.com')) {
-      console.log('URL không phải từ Cloudinary');
+    if (!imageUrl || !imageUrl.includes("cloudinary.com")) {
+      console.log("URL không phải từ Cloudinary");
       return null;
     }
 
     // Tách URL và lấy phần sau '/upload/'
-    const parts = imageUrl.split('/upload/');
+    const parts = imageUrl.split("/upload/");
     if (parts.length < 2) {
-      console.log('URL không có phần /upload/');
+      console.log("URL không có phần /upload/");
       return null;
     }
 
     let pathAfterUpload = parts[1];
-    console.log('Path sau upload:', pathAfterUpload);
+    console.log("Path sau upload:", pathAfterUpload);
 
     // Bỏ version nếu có (vXXXXXXXXXX/)
-    pathAfterUpload = pathAfterUpload.replace(/^v\d+\//, '');
-    console.log('Path sau khi bỏ version:', pathAfterUpload);
+    pathAfterUpload = pathAfterUpload.replace(/^v\d+\//, "");
+    console.log("Path sau khi bỏ version:", pathAfterUpload);
 
     // Bỏ các transformations nếu có (như w_500,h_300,c_fill/ etc.)
-    const segments = pathAfterUpload.split('/');
+    const segments = pathAfterUpload.split("/");
     const lastSegment = segments[segments.length - 1];
 
     // Nếu có nhiều segments và segment cuối có extension, lấy path đầy đủ trừ extension
     let publicId;
     if (segments.length > 1) {
       // Có folder: images/filename.jpg -> images/filename
-      publicId = pathAfterUpload.replace(/\.[^/.]+$/, ''); // Bỏ extension cuối
+      publicId = pathAfterUpload.replace(/\.[^/.]+$/, ""); // Bỏ extension cuối
     } else {
       // Không có folder: filename.jpg -> filename
-      publicId = lastSegment.replace(/\.[^/.]+$/, '');
+      publicId = lastSegment.replace(/\.[^/.]+$/, "");
     }
 
-    console.log('PublicId được trích xuất:', publicId);
+    console.log("PublicId được trích xuất:", publicId);
     return publicId;
   } catch (error) {
-    console.error('Lỗi khi trích xuất publicId:', error);
+    console.error("Lỗi khi trích xuất publicId:", error);
     return null;
   }
 }
@@ -246,7 +256,7 @@ async function deleteBook(id) {
     const book = await Sach.findById(id);
 
     if (!book) {
-      throw new Error('Không tìm thấy sách để xóa');
+      throw new Error("Không tìm thấy sách để xóa");
     }
 
     const publicId = extractPublicIdFromUrl(book.Image);
@@ -256,20 +266,19 @@ async function deleteBook(id) {
     if (publicId) {
       try {
         await deleteImageFromCloudinary(publicId);
-        console.log('Đã xóa ảnh từ Cloudinary:', publicId);
+        console.log("Đã xóa ảnh từ Cloudinary:", publicId);
       } catch (imageError) {
-        console.warn('Không thể xóa ảnh từ Cloudinary:', imageError.message);
+        console.warn("Không thể xóa ảnh từ Cloudinary:", imageError.message);
       }
     } else {
-      console.warn('Không thể trích xuất publicId từ URL:', book.Image);
+      console.warn("Không thể trích xuất publicId từ URL:", book.Image);
     }
 
     return result;
   } catch (err) {
-    console.error('Lỗi khi xóa sách:', err);
+    console.error("Lỗi khi xóa sách:", err);
     throw err;
   }
-
 }
 
 async function lendBook(data) {
@@ -280,14 +289,13 @@ async function lendBook(data) {
       MaSach,
       MaDocGia,
       SoLuong: SoLuongMuon,
-      TrangThai: 'pending'
+      TrangThai: "pending",
     });
 
     const savedRecord = await record.save();
     return savedRecord;
-
   } catch (err) {
-    console.error('Lỗi khi mượn sách:', err);
+    console.error("Lỗi khi mượn sách:", err);
     throw err;
   }
 }
@@ -299,11 +307,13 @@ async function getInfoLendBook(data) {
     const lendRecord = await TheoDoiMuonSach.findOne({
       MaSach,
       MaDocGia,
-      TrangThai: { $in: ['pending', 'approved', 'borrowing', 'returned', 'overdue'] }
+      TrangThai: {
+        $in: ["pending", "approved", "borrowing", "returned", "overdue"],
+      },
     }).sort({ createdAt: -1 }); // Lấy record mới nhất
     return lendRecord;
   } catch (err) {
-    console.error('Lỗi khi lấy thông tin mượn sách:', err);
+    console.error("Lỗi khi lấy thông tin mượn sách:", err);
     throw err;
   }
 }
@@ -312,22 +322,23 @@ async function getTrackBorrowBook() {
   try {
     const trackBorrowList = await TheoDoiMuonSach.find()
       .populate({
-        path: 'MaSach',
-        select: 'MaSach TenSach TacGia DonGia SoQuyen NamXuatBan Image MoTaSach'
+        path: "MaSach",
+        select:
+          "MaSach TenSach TacGia DonGia SoQuyen NamXuatBan Image MoTaSach",
       })
       .populate({
-        path: 'MaDocGia',
-        select: 'MaDocGia HoLot Ten NgaySinh Phai DiaChi DienThoai'
+        path: "MaDocGia",
+        select: "MaDocGia HoLot Ten NgaySinh Phai DiaChi DienThoai",
       })
       .populate({
-        path: 'Msnv',
-        select: 'Msnv HoTenNV ChucVu'
+        path: "Msnv",
+        select: "Msnv HoTenNV ChucVu",
       })
       .sort({ createdAt: -1 }); // Sắp xếp theo thời gian tạo mới nhất
 
     return trackBorrowList;
   } catch (err) {
-    console.error('Lỗi khi lấy danh sách theo dõi mượn sách:', err);
+    console.error("Lỗi khi lấy danh sách theo dõi mượn sách:", err);
     throw err;
   }
 }
@@ -336,38 +347,56 @@ async function updateBorrowStatus(requestId, adminId, status) {
   try {
     const updateFields = { TrangThai: status };
 
-    if (status !== 'overdue') {
+    if (status !== "overdue") {
       updateFields.Msnv = adminId;
     }
 
-    if (status === 'approved') {
-      const now = new Date();
-      updateFields.NgayMuon = now;
-      updateFields.NgayTra = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-      // Lấy thông tin yêu cầu mượn để biết MaSach và SoLuong
-      const request = await TheoDoiMuonSach.findById(requestId);
-      if (!request) {
-        throw new Error('Không tìm thấy yêu cầu mượn');
+    // Chỉ xử lý logic trừ sách khi chuyển từ processing → approved
+    if (status === "approved") {
+      // Kiểm tra trạng thái hiện tại
+      const currentRequest = await TheoDoiMuonSach.findById(requestId);
+      if (!currentRequest) {
+        throw new Error("Không tìm thấy yêu cầu mượn");
       }
 
-      const sach = await Sach.findById(request.MaSach);
-      if (!sach) {
-        throw new Error('Không tìm thấy sách');
-      }
+      // Chỉ xử lý khi chuyển từ processing → approved
+      if (currentRequest.TrangThai === "processing") {
+        const now = new Date();
+        updateFields.NgayMuon = now;
 
-      // Kiểm tra đủ số lượng không
-      if (sach.SoQuyen < request.SoLuong) {
-        throw new Error('Không đủ số lượng sách để cho mượn');
-      }
+        const quyDinh = await QuyDinhMuonSach.findOne({});
+        const duration = (quyDinh && quyDinh.borrowDuration) || 7;
 
-      // Trừ số lượng sách
-      sach.SoQuyen -= request.SoLuong;
-      await sach.save();
+        updateFields.NgayTra = new Date(
+          now.getTime() + duration * 24 * 60 * 60 * 1000
+        );
+
+        const sach = await Sach.findById(currentRequest.MaSach);
+        if (!sach) {
+          throw new Error("Không tìm thấy sách");
+        }
+
+        // Kiểm tra đủ số lượng không
+        if (sach.SoQuyen < currentRequest.SoLuong) {
+          throw new Error("Không đủ số lượng sách để cho mượn");
+        }
+
+        // Trừ số lượng sách
+        sach.SoQuyen -= currentRequest.SoLuong;
+        await sach.save();
+      } else {
+        throw new Error(
+          'Chỉ có thể chuyển sang "approved" từ trạng thái "processing"'
+        );
+      }
     }
 
-    if (status === 'returned') {
+    if (status === "returned") {
       updateFields.NgayGhiNhanTra = new Date();
+    }
+
+    if (status === "processing") {
+      updateFields.NgayDuyet = new Date();
     }
 
     const updated = await TheoDoiMuonSach.findByIdAndUpdate(
@@ -378,7 +407,7 @@ async function updateBorrowStatus(requestId, adminId, status) {
 
     return updated;
   } catch (err) {
-    console.error('Lỗi khi cập nhật trạng thái mượn sách:', err);
+    console.error("Lỗi khi cập nhật trạng thái mượn sách:", err);
     throw err;
   }
 }
@@ -413,6 +442,20 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
     const sach = await Sach.findById(request.MaSach);
     if (!sach) throw new Error("Không tìm thấy sách");
 
+    // ====== LẤY QUY ĐỊNH PHẠT TỪ DATABASE ======
+    const QuyDinhPhatSach = mongoose.model("QuyDinhPhatSach");
+    const penaltyRules = await QuyDinhPhatSach.findOne()
+      .sort({ updatedAt: -1 })
+      .exec();
+
+    // Nếu không có quy định thì dùng mặc định
+    const rules = penaltyRules || {
+      coefLost: 1.3,
+      feeManage: 50000,
+      coefDamageLight: 20,
+      feeLate: 5000,
+    };
+
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -427,16 +470,20 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
         Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24))
       );
 
-      phiQuaHan = daysLate * 5000 * request.SoLuong;
+      // Sử dụng quy định từ database
+      phiQuaHan = daysLate * rules.feeLate * request.SoLuong;
     }
-
 
     // ====== XỬ LÝ TÌNH TRẠNG SÁCH ======
     let phiBoiThuong = 0;
     if (bookCondition === "Mất sách") {
-      phiBoiThuong = request.SoLuong * sach.DonGia * 1.3 + 50000;
+      // Sử dụng quy định từ database
+      phiBoiThuong =
+        request.SoLuong * sach.DonGia * rules.coefLost + rules.feeManage;
     } else if (bookCondition === "Hư sách") {
-      phiBoiThuong = request.SoLuong * sach.DonGia * 0.2;
+      // Sử dụng quy định từ database (chuyển % thành decimal)
+      phiBoiThuong =
+        request.SoLuong * sach.DonGia * (rules.coefDamageLight / 100);
     }
 
     // ====== CẬP NHẬT TRẠNG THÁI ======
@@ -446,7 +493,7 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
       TinhTrangSach: bookCondition,
       PhiBoiThuong: phiBoiThuong,
       PhiQuaHan: phiQuaHan,
-      NgayCapNhatTinhTrangSach: now
+      NgayCapNhatTinhTrangSach: now,
     };
 
     if (phiQuaHan > 0 || phiBoiThuong > 0) {
@@ -478,7 +525,7 @@ async function confirmPaidCompensation(requestId) {
       requestId,
       {
         DaThanhToan: true,
-        NgayGhiNhanThanhToan: new Date()
+        NgayGhiNhanThanhToan: new Date(),
       },
       { new: true }
     );
@@ -499,25 +546,25 @@ async function extendBorrowTime(requestId, adminId, newDueDate) {
     const request = await TheoDoiMuonSach.findById(requestId);
 
     if (!request) {
-      throw new Error('Không tìm thấy yêu cầu mượn sách');
+      throw new Error("Không tìm thấy yêu cầu mượn sách");
     }
 
-    if (request.TrangThai !== 'approved') {
-      throw new Error('Chỉ có thể gia hạn cho yêu cầu đã được duyệt');
+    if (request.TrangThai !== "approved") {
+      throw new Error("Chỉ có thể gia hạn cho yêu cầu đã được duyệt");
     }
 
     if (!request.NgayTra) {
-      throw new Error('Không có ngày trả hiện tại để gia hạn');
+      throw new Error("Không có ngày trả hiện tại để gia hạn");
     }
 
     if (request.DaGiaHan) {
-      throw new Error('Yêu cầu này đã được gia hạn trước đó');
+      throw new Error("Yêu cầu này đã được gia hạn trước đó");
     }
 
     const newDate = new Date(newDueDate);
 
     if (newDate <= request.NgayTra) {
-      throw new Error('Ngày gia hạn phải sau ngày trả hiện tại');
+      throw new Error("Ngày gia hạn phải sau ngày trả hiện tại");
     }
 
     // Cập nhật
@@ -528,7 +575,7 @@ async function extendBorrowTime(requestId, adminId, newDueDate) {
     const updated = await request.save();
     return updated;
   } catch (err) {
-    console.error('Lỗi khi gia hạn mượn sách:', err);
+    console.error("Lỗi khi gia hạn mượn sách:", err);
     throw err;
   }
 }
@@ -537,15 +584,16 @@ async function getBorrowBookOfUser(userId) {
   try {
     const borrowedBooks = await TheoDoiMuonSach.find({ MaDocGia: userId })
       .populate({
-        path: 'MaSach',
-        select: 'MaSach TenSach TacGia Image MoTaSach DonGia NamXuatBan MaTheLoai'
+        path: "MaSach",
+        select:
+          "MaSach TenSach TacGia Image MoTaSach DonGia NamXuatBan MaTheLoai",
       })
       .sort({ createdAt: -1 }) // Đảo ngược: mới nhất trước
       .exec();
 
     return borrowedBooks;
   } catch (error) {
-    console.error('Lỗi khi lấy sách đã mượn của user:', error);
+    console.error("Lỗi khi lấy sách đã mượn của user:", error);
     throw error;
   }
 }
@@ -556,15 +604,15 @@ async function countCurrentBorrowing(MaDocGia) {
       {
         $match: {
           MaDocGia: mongoose.Types.ObjectId(MaDocGia),
-          TrangThai: { $in: ['approved', 'overdue'] }
-        }
+          TrangThai: { $in: ["approved", "overdue"] },
+        },
       },
       {
         $group: {
           _id: null,
-          totalSoLuong: { $sum: "$SoLuong" }
-        }
-      }
+          totalSoLuong: { $sum: "$SoLuong" },
+        },
+      },
     ]);
 
     if (result && result.length > 0) {
@@ -592,16 +640,16 @@ async function countCurrentBorrowingToday(MaDocGia) {
       {
         $match: {
           MaDocGia: mongoose.Types.ObjectId(MaDocGia),
-          TrangThai: { $in: ['approved', 'overdue'] },
-          NgayMuon: { $gte: startOfDay, $lte: endOfDay } // chỉ tính hôm nay
-        }
+          TrangThai: { $in: ["approved", "overdue"] },
+          NgayMuon: { $gte: startOfDay, $lte: endOfDay }, // chỉ tính hôm nay
+        },
       },
       {
         $group: {
           _id: null,
-          totalSoLuong: { $sum: "$SoLuong" }
-        }
-      }
+          totalSoLuong: { $sum: "$SoLuong" },
+        },
+      },
     ]);
 
     if (result && result.length > 0) {
@@ -621,15 +669,15 @@ async function countCurrentPending(MaDocGia) {
       {
         $match: {
           MaDocGia: mongoose.Types.ObjectId(MaDocGia),
-          TrangThai: 'pending'   // chỉ lấy pending
-        }
+          TrangThai: "pending", // chỉ lấy pending
+        },
       },
       {
         $group: {
           _id: null,
-          totalSoLuong: { $sum: "$SoLuong" }
-        }
-      }
+          totalSoLuong: { $sum: "$SoLuong" },
+        },
+      },
     ]);
 
     if (result && result.length > 0) {
@@ -656,16 +704,16 @@ async function countCurrentPendingToDay(MaDocGia) {
       {
         $match: {
           MaDocGia: mongoose.Types.ObjectId(MaDocGia),
-          TrangThai: 'pending',
-          createdAt: { $gte: startOfDay, $lte: endOfDay } // ✅ dùng createdAt
-        }
+          TrangThai: "pending",
+          createdAt: { $gte: startOfDay, $lte: endOfDay }, // ✅ dùng createdAt
+        },
       },
       {
         $group: {
           _id: null,
-          totalSoLuong: { $sum: "$SoLuong" }
-        }
-      }
+          totalSoLuong: { $sum: "$SoLuong" },
+        },
+      },
     ]);
 
     return result.length > 0 ? result[0].totalSoLuong : 0;
@@ -679,7 +727,7 @@ async function deletePending(bookId, readerId) {
   const result = await TheoDoiMuonSach.deleteOne({
     MaSach: bookId,
     MaDocGia: readerId,
-    TrangThai: 'pending'
+    TrangThai: "pending",
   });
 
   return result.deletedCount > 0;
@@ -688,24 +736,24 @@ async function deletePending(bookId, readerId) {
 async function addFavoriteBook(bookId, readerId) {
   const newFavorite = new YeuThichSach({
     MaSach: bookId,
-    MaDocGia: readerId
+    MaDocGia: readerId,
   });
   const savedFavorite = await newFavorite.save();
   return savedFavorite;
 }
 
 async function getFavoriteBooks(readerId) {
-  const favorites = await YeuThichSach
-    .find({ MaDocGia: readerId })
-    .select('MaSach -_id');
+  const favorites = await YeuThichSach.find({ MaDocGia: readerId }).select(
+    "MaSach -_id"
+  );
 
-  return favorites.map(f => f.MaSach);
+  return favorites.map((f) => f.MaSach);
 }
 
 async function deleteFavoriteBook(bookId, readerId) {
   const result = await YeuThichSach.deleteOne({
     MaSach: bookId,
-    MaDocGia: readerId
+    MaDocGia: readerId,
   });
 
   return result.deletedCount > 0;
@@ -718,7 +766,7 @@ async function getRatingByBookAndReader(bookId, readerId) {
 
   return await DanhGiaSach.findOne({
     MaSach: bookId,
-    MaDocGia: readerId
+    MaDocGia: readerId,
   }).populate("MaDocGia", "HoLot Ten");
 }
 
@@ -728,7 +776,7 @@ async function getRatingByBook(bookId) {
   }
 
   return await DanhGiaSach.find({
-    MaSach: bookId
+    MaSach: bookId,
   }).populate("MaDocGia", "HoLot Ten");
 }
 
@@ -747,14 +795,15 @@ async function addRatingBook(bookId, readerId, stars, comment) {
     !bookId ||
     !readerId ||
     typeof stars !== "number" ||
-    stars < 1 || stars > 5
+    stars < 1 ||
+    stars > 5
   ) {
     throw new Error("Dữ liệu đánh giá không hợp lệ. Cần có sao (1-5).");
   }
 
   const existingRating = await DanhGiaSach.findOne({
     MaSach: bookId,
-    MaDocGia: readerId
+    MaDocGia: readerId,
   });
 
   if (existingRating) {
@@ -765,7 +814,7 @@ async function addRatingBook(bookId, readerId, stars, comment) {
     MaSach: bookId,
     MaDocGia: readerId,
     SoSao: stars,
-    BinhLuan: comment.trim()
+    BinhLuan: comment.trim(),
   });
 
   const savedRating = await newRating.save();
@@ -779,7 +828,7 @@ async function updateRatingComment(bookId, readerId, comment) {
 
   const existingRating = await DanhGiaSach.findOne({
     MaSach: bookId,
-    MaDocGia: readerId
+    MaDocGia: readerId,
   });
 
   if (!existingRating) {
@@ -794,7 +843,7 @@ async function updateRatingComment(bookId, readerId, comment) {
 async function deleteRatingBook(bookId, readerId) {
   const result = await DanhGiaSach.deleteOne({
     MaSach: bookId,
-    MaDocGia: readerId
+    MaDocGia: readerId,
   });
 
   return result.deletedCount > 0;
@@ -808,7 +857,7 @@ async function addBookView(bookId, readerId) {
   // Tạo một record mới cho lượt xem
   const newView = new TheoDoiXemSach({
     MaSach: bookId,
-    MaDocGia: readerId
+    MaDocGia: readerId,
   });
 
   const savedView = await newView.save();
@@ -820,8 +869,8 @@ async function getMostViewBook() {
     {
       $group: {
         _id: "$MaSach",
-        totalViews: { $sum: 1 }
-      }
+        totalViews: { $sum: 1 },
+      },
     },
     { $sort: { totalViews: -1 } },
     { $limit: 3 },
@@ -830,8 +879,8 @@ async function getMostViewBook() {
         from: "saches", // tên collection của model Sach (mặc định plural hóa)
         localField: "_id",
         foreignField: "_id",
-        as: "bookInfo"
-      }
+        as: "bookInfo",
+      },
     },
     { $unwind: "$bookInfo" },
     {
@@ -840,9 +889,9 @@ async function getMostViewBook() {
         TenSach: "$bookInfo.TenSach",
         TacGia: "$bookInfo.TacGia",
         Image: "$bookInfo.Image",
-        totalViews: 1
-      }
-    }
+        totalViews: 1,
+      },
+    },
   ]);
 
   return topBooks;
@@ -866,22 +915,22 @@ async function getTopTenWeekBook(limit = 10) {
   async function getWeekData(start, end) {
     const viewsAgg = await TheoDoiXemSach.aggregate([
       { $match: { ThoiDiemXem: { $gte: start, $lt: end } } },
-      { $group: { _id: '$MaSach', views_7d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", views_7d: { $sum: 1 } } },
     ]);
 
     const borrowsAgg = await TheoDoiMuonSach.aggregate([
       {
         $match: {
           NgayMuon: { $gte: start, $lt: end },
-          TrangThai: { $in: ['approved', 'returned'] }
-        }
+          TrangThai: { $in: ["approved", "returned"] },
+        },
       },
-      { $group: { _id: '$MaSach', borrows_7d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", borrows_7d: { $sum: 1 } } },
     ]);
 
     const ratingsAgg = await DanhGiaSach.aggregate([
       { $match: { NgayDanhGia: { $gte: start, $lt: end } } },
-      { $group: { _id: '$MaSach', ratings_7d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", ratings_7d: { $sum: 1 } } },
     ]);
 
     const scoreMap = new Map();
@@ -893,19 +942,19 @@ async function getTopTenWeekBook(limit = 10) {
       return scoreMap.get(bookIdStr);
     }
 
-    viewsAgg.forEach(d => {
+    viewsAgg.forEach((d) => {
       const idStr = d._id.toString();
       const entry = ensureEntry(idStr);
       entry.views_7d = d.views_7d || 0;
     });
 
-    borrowsAgg.forEach(d => {
+    borrowsAgg.forEach((d) => {
       const idStr = d._id.toString();
       const entry = ensureEntry(idStr);
       entry.borrows_7d = d.borrows_7d || 0;
     });
 
-    ratingsAgg.forEach(d => {
+    ratingsAgg.forEach((d) => {
       const idStr = d._id.toString();
       const entry = ensureEntry(idStr);
       entry.ratings_7d = d.ratings_7d || 0;
@@ -925,7 +974,7 @@ async function getTopTenWeekBook(limit = 10) {
           views_7d: counts.views_7d || 0,
           borrows_7d: counts.borrows_7d || 0,
           ratings_7d: counts.ratings_7d || 0,
-          score_week
+          score_week,
         });
 
         processedBookIds.add(bookIdStr);
@@ -937,7 +986,8 @@ async function getTopTenWeekBook(limit = 10) {
 
   // Fallback logic: lùi tuần cho đến khi đủ sách
   let tries = 0;
-  while (allScoredBooks.length < limit && tries < 12) { // tối đa 12 tuần (3 tháng)
+  while (allScoredBooks.length < limit && tries < 12) {
+    // tối đa 12 tuần (3 tháng)
     const weekData = await getWeekData(startOfWeek, endOfWeek);
 
     // Thêm sách từ tuần này vào tổng
@@ -958,7 +1008,7 @@ async function getTopTenWeekBook(limit = 10) {
 
   // nếu vẫn trống sau khi fallback → trả mảng rỗng
   if (allScoredBooks.length === 0) {
-    console.log('Không tìm thấy sách nào trong 12 tuần qua');
+    console.log("Không tìm thấy sách nào trong 12 tuần qua");
     return [];
   }
 
@@ -972,44 +1022,52 @@ async function getTopTenWeekBook(limit = 10) {
   const bookIds = topSlice.map((s) => mongoose.Types.ObjectId(s.bookIdStr));
 
   const bookDocs = await Sach.find({ _id: { $in: bookIds } })
-    .select('MaSach TenSach TacGia Image')
+    .select("MaSach TenSach TacGia Image")
     .lean();
 
-  const bookDocMap = new Map(bookDocs.map(b => [b._id.toString(), b]));
+  const bookDocMap = new Map(bookDocs.map((b) => [b._id.toString(), b]));
 
   // Tính số sao trung bình cho từng sách
   const ratingsData = await DanhGiaSach.aggregate([
     { $match: { MaSach: { $in: bookIds } } },
     {
       $group: {
-        _id: '$MaSach',
-        avgRating: { $avg: '$SoSao' },
-        totalRatings: { $sum: 1 }
-      }
-    }
+        _id: "$MaSach",
+        avgRating: { $avg: "$SoSao" },
+        totalRatings: { $sum: 1 },
+      },
+    },
   ]);
 
-  const ratingsMap = new Map(ratingsData.map(r => [r._id.toString(), {
-    avgRating: r.avgRating || 0,
-    totalRatings: r.totalRatings || 0
-  }]));
+  const ratingsMap = new Map(
+    ratingsData.map((r) => [
+      r._id.toString(),
+      {
+        avgRating: r.avgRating || 0,
+        totalRatings: r.totalRatings || 0,
+      },
+    ])
+  );
 
   // Gộp thông tin sách vào kết quả trả về, giữ đúng thứ tự của topSlice
-  const finalResult = topSlice.map(item => {
+  const finalResult = topSlice.map((item) => {
     const doc = bookDocMap.get(item.bookIdStr);
-    const rating = ratingsMap.get(item.bookIdStr) || { avgRating: 0, totalRatings: 0 };
+    const rating = ratingsMap.get(item.bookIdStr) || {
+      avgRating: 0,
+      totalRatings: 0,
+    };
 
     return {
       _id: doc ? doc._id : mongoose.Types.ObjectId(item.bookIdStr),
       MaSach: doc ? doc.MaSach : null,
-      TenSach: doc ? doc.TenSach : '',
-      TacGia: doc ? doc.TacGia : '',
-      Image: doc ? doc.Image : '',
+      TenSach: doc ? doc.TenSach : "",
+      TacGia: doc ? doc.TacGia : "",
+      Image: doc ? doc.Image : "",
       views_7d: item.views_7d,
       borrows_7d: item.borrows_7d,
       ratings_7d: item.ratings_7d,
       score_week: item.score_week,
-      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)) // Làm tròn 1 chữ số thập phân
+      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)), // Làm tròn 1 chữ số thập phân
     };
   });
 
@@ -1033,46 +1091,50 @@ async function getTodayBook(limit = 6) {
   async function getDayData(start, end) {
     const viewsAgg = await TheoDoiXemSach.aggregate([
       { $match: { ThoiDiemXem: { $gte: start, $lt: end } } },
-      { $group: { _id: '$MaSach', views_today: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", views_today: { $sum: 1 } } },
     ]);
 
     const borrowsAgg = await TheoDoiMuonSach.aggregate([
       {
         $match: {
           NgayMuon: { $gte: start, $lt: end },
-          TrangThai: { $in: ['approved', 'returned'] }
-        }
+          TrangThai: { $in: ["approved", "returned"] },
+        },
       },
-      { $group: { _id: '$MaSach', borrows_today: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", borrows_today: { $sum: 1 } } },
     ]);
 
     const ratingsAgg = await DanhGiaSach.aggregate([
       { $match: { NgayDanhGia: { $gte: start, $lt: end } } },
-      { $group: { _id: '$MaSach', ratings_today: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", ratings_today: { $sum: 1 } } },
     ]);
 
     const scoreMap = new Map();
 
     function ensureEntry(bookIdStr) {
       if (!scoreMap.has(bookIdStr)) {
-        scoreMap.set(bookIdStr, { views_today: 0, borrows_today: 0, ratings_today: 0 });
+        scoreMap.set(bookIdStr, {
+          views_today: 0,
+          borrows_today: 0,
+          ratings_today: 0,
+        });
       }
       return scoreMap.get(bookIdStr);
     }
 
-    viewsAgg.forEach(d => {
+    viewsAgg.forEach((d) => {
       const idStr = d._id.toString();
       const entry = ensureEntry(idStr);
       entry.views_today = d.views_today || 0;
     });
 
-    borrowsAgg.forEach(d => {
+    borrowsAgg.forEach((d) => {
       const idStr = d._id.toString();
       const entry = ensureEntry(idStr);
       entry.borrows_today = d.borrows_today || 0;
     });
 
-    ratingsAgg.forEach(d => {
+    ratingsAgg.forEach((d) => {
       const idStr = d._id.toString();
       const entry = ensureEntry(idStr);
       entry.ratings_today = d.ratings_today || 0;
@@ -1092,7 +1154,7 @@ async function getTodayBook(limit = 6) {
           views_today: counts.views_today || 0,
           borrows_today: counts.borrows_today || 0,
           ratings_today: counts.ratings_today || 0,
-          score_today
+          score_today,
         });
 
         processedBookIds.add(bookIdStr);
@@ -1125,7 +1187,7 @@ async function getTodayBook(limit = 6) {
 
   // nếu vẫn trống sau khi fallback → trả mảng rỗng
   if (allScoredBooks.length === 0) {
-    console.log('❌ Không tìm thấy sách nào trong 30 ngày qua');
+    console.log("❌ Không tìm thấy sách nào trong 30 ngày qua");
     return [];
   }
 
@@ -1139,44 +1201,52 @@ async function getTodayBook(limit = 6) {
   const bookIds = topSlice.map((s) => mongoose.Types.ObjectId(s.bookIdStr));
 
   const bookDocs = await Sach.find({ _id: { $in: bookIds } })
-    .select('MaSach TenSach TacGia Image')
+    .select("MaSach TenSach TacGia Image")
     .lean();
 
-  const bookDocMap = new Map(bookDocs.map(b => [b._id.toString(), b]));
+  const bookDocMap = new Map(bookDocs.map((b) => [b._id.toString(), b]));
 
   // Tính số sao trung bình cho từng sách
   const ratingsData = await DanhGiaSach.aggregate([
     { $match: { MaSach: { $in: bookIds } } },
     {
       $group: {
-        _id: '$MaSach',
-        avgRating: { $avg: '$SoSao' },
-        totalRatings: { $sum: 1 }
-      }
-    }
+        _id: "$MaSach",
+        avgRating: { $avg: "$SoSao" },
+        totalRatings: { $sum: 1 },
+      },
+    },
   ]);
 
-  const ratingsMap = new Map(ratingsData.map(r => [r._id.toString(), {
-    avgRating: r.avgRating || 0,
-    totalRatings: r.totalRatings || 0
-  }]));
+  const ratingsMap = new Map(
+    ratingsData.map((r) => [
+      r._id.toString(),
+      {
+        avgRating: r.avgRating || 0,
+        totalRatings: r.totalRatings || 0,
+      },
+    ])
+  );
 
   // Gộp thông tin sách vào kết quả trả về, giữ đúng thứ tự của topSlice
-  const finalResult = topSlice.map(item => {
+  const finalResult = topSlice.map((item) => {
     const doc = bookDocMap.get(item.bookIdStr);
-    const rating = ratingsMap.get(item.bookIdStr) || { avgRating: 0, totalRatings: 0 };
+    const rating = ratingsMap.get(item.bookIdStr) || {
+      avgRating: 0,
+      totalRatings: 0,
+    };
 
     return {
       _id: doc ? doc._id : mongoose.Types.ObjectId(item.bookIdStr),
       MaSach: doc ? doc.MaSach : null,
-      TenSach: doc ? doc.TenSach : '',
-      TacGia: doc ? doc.TacGia : '',
-      Image: doc ? doc.Image : '',
+      TenSach: doc ? doc.TenSach : "",
+      TacGia: doc ? doc.TacGia : "",
+      Image: doc ? doc.Image : "",
       views_today: item.views_today,
       borrows_today: item.borrows_today,
       ratings_today: item.ratings_today,
       score_today: item.score_today,
-      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)) // Làm tròn 1 chữ số thập phân
+      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)), // Làm tròn 1 chữ số thập phân
     };
   });
 
@@ -1208,42 +1278,42 @@ async function getTrendingBook(limit) {
   async function getPeriodData(start7d, end, start14d) {
     const views7dAgg = await TheoDoiXemSach.aggregate([
       { $match: { ThoiDiemXem: { $gte: start7d, $lt: end } } },
-      { $group: { _id: '$MaSach', views_7d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", views_7d: { $sum: 1 } } },
     ]);
 
     const borrows7dAgg = await TheoDoiMuonSach.aggregate([
       {
         $match: {
           NgayMuon: { $gte: start7d, $lt: end },
-          TrangThai: { $in: ['approved', 'returned'] }
-        }
+          TrangThai: { $in: ["approved", "returned"] },
+        },
       },
-      { $group: { _id: '$MaSach', borrows_7d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", borrows_7d: { $sum: 1 } } },
     ]);
 
     const ratings7dAgg = await DanhGiaSach.aggregate([
       { $match: { NgayDanhGia: { $gte: start7d, $lt: end } } },
-      { $group: { _id: '$MaSach', ratings_7d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", ratings_7d: { $sum: 1 } } },
     ]);
 
     const views14dAgg = await TheoDoiXemSach.aggregate([
       { $match: { ThoiDiemXem: { $gte: start14d, $lt: end } } },
-      { $group: { _id: '$MaSach', views_14d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", views_14d: { $sum: 1 } } },
     ]);
 
     const borrows14dAgg = await TheoDoiMuonSach.aggregate([
       {
         $match: {
           NgayMuon: { $gte: start14d, $lt: end },
-          TrangThai: { $in: ['approved', 'returned'] }
-        }
+          TrangThai: { $in: ["approved", "returned"] },
+        },
       },
-      { $group: { _id: '$MaSach', borrows_14d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", borrows_14d: { $sum: 1 } } },
     ]);
 
     const ratings14dAgg = await DanhGiaSach.aggregate([
       { $match: { NgayDanhGia: { $gte: start14d, $lt: end } } },
-      { $group: { _id: '$MaSach', ratings_14d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", ratings_14d: { $sum: 1 } } },
     ]);
 
     const scoreMap = new Map();
@@ -1251,35 +1321,39 @@ async function getTrendingBook(limit) {
     function ensureEntry(bookIdStr) {
       if (!scoreMap.has(bookIdStr)) {
         scoreMap.set(bookIdStr, {
-          views_7d: 0, borrows_7d: 0, ratings_7d: 0,
-          views_14d: 0, borrows_14d: 0, ratings_14d: 0
+          views_7d: 0,
+          borrows_7d: 0,
+          ratings_7d: 0,
+          views_14d: 0,
+          borrows_14d: 0,
+          ratings_14d: 0,
         });
       }
       return scoreMap.get(bookIdStr);
     }
 
-    views7dAgg.forEach(d => {
+    views7dAgg.forEach((d) => {
       const entry = ensureEntry(d._id.toString());
       entry.views_7d = d.views_7d || 0;
     });
-    borrows7dAgg.forEach(d => {
+    borrows7dAgg.forEach((d) => {
       const entry = ensureEntry(d._id.toString());
       entry.borrows_7d = d.borrows_7d || 0;
     });
-    ratings7dAgg.forEach(d => {
+    ratings7dAgg.forEach((d) => {
       const entry = ensureEntry(d._id.toString());
       entry.ratings_7d = d.ratings_7d || 0;
     });
 
-    views14dAgg.forEach(d => {
+    views14dAgg.forEach((d) => {
       const entry = ensureEntry(d._id.toString());
       entry.views_14d = d.views_14d || 0;
     });
-    borrows14dAgg.forEach(d => {
+    borrows14dAgg.forEach((d) => {
       const entry = ensureEntry(d._id.toString());
       entry.borrows_14d = d.borrows_14d || 0;
     });
-    ratings14dAgg.forEach(d => {
+    ratings14dAgg.forEach((d) => {
       const entry = ensureEntry(d._id.toString());
       entry.ratings_14d = d.ratings_14d || 0;
     });
@@ -1287,8 +1361,10 @@ async function getTrendingBook(limit) {
     const result = [];
     for (const [bookIdStr, counts] of scoreMap.entries()) {
       if (!processedBookIds.has(bookIdStr)) {
-        const recent_activity = counts.views_7d + counts.borrows_7d + counts.ratings_7d;
-        const total_activity = counts.views_14d + counts.borrows_14d + counts.ratings_14d;
+        const recent_activity =
+          counts.views_7d + counts.borrows_7d + counts.ratings_7d;
+        const total_activity =
+          counts.views_14d + counts.borrows_14d + counts.ratings_14d;
         const previous_activity = total_activity - recent_activity;
 
         let trending_score = 0;
@@ -1314,7 +1390,12 @@ async function getTrendingBook(limit) {
           // Growth factor: nếu có tăng trưởng thì bonus
           let growth_factor = 1.0;
           if (previous_activity > 0 && recent_activity > previous_activity) {
-            growth_factor = 1 + Math.min((recent_activity - previous_activity) / previous_activity, 1.0);
+            growth_factor =
+              1 +
+              Math.min(
+                (recent_activity - previous_activity) / previous_activity,
+                1.0
+              );
           }
 
           // Công thức cuối: Fresh Discovery Score
@@ -1331,7 +1412,7 @@ async function getTrendingBook(limit) {
           views_14d: counts.views_14d,
           borrows_14d: counts.borrows_14d,
           ratings_14d: counts.ratings_14d,
-          growth_rate: trending_score
+          growth_rate: trending_score,
         });
 
         processedBookIds.add(bookIdStr);
@@ -1344,7 +1425,11 @@ async function getTrendingBook(limit) {
   // Fallback logic: lùi period cho đến khi đủ sách
   let tries = 0;
   while ((!limit || allScoredBooks.length < limit) && tries < 12) {
-    const periodData = await getPeriodData(startOfWeek, endOfPeriod, startOf2Weeks);
+    const periodData = await getPeriodData(
+      startOfWeek,
+      endOfPeriod,
+      startOf2Weeks
+    );
     allScoredBooks.push(...periodData);
 
     if (limit && allScoredBooks.length >= limit) break;
@@ -1360,7 +1445,9 @@ async function getTrendingBook(limit) {
   }
 
   // Lọc ra chỉ những sách có trending_score > 0
-  const validTrendingBooks = allScoredBooks.filter(book => book.growth_rate > 0);
+  const validTrendingBooks = allScoredBooks.filter(
+    (book) => book.growth_rate > 0
+  );
 
   if (validTrendingBooks.length === 0) {
     return [];
@@ -1370,42 +1457,52 @@ async function getTrendingBook(limit) {
   validTrendingBooks.sort((a, b) => b.growth_rate - a.growth_rate);
 
   // Nếu có limit thì slice, nếu không thì lấy hết
-  const topSlice = limit ? validTrendingBooks.slice(0, limit) : validTrendingBooks;
+  const topSlice = limit
+    ? validTrendingBooks.slice(0, limit)
+    : validTrendingBooks;
 
   // Lấy thông tin sách
-  const bookIds = topSlice.map(s => mongoose.Types.ObjectId(s.bookIdStr));
+  const bookIds = topSlice.map((s) => mongoose.Types.ObjectId(s.bookIdStr));
   const bookDocs = await Sach.find({ _id: { $in: bookIds } })
-    .select('MaSach TenSach TacGia Image')
+    .select("MaSach TenSach TacGia Image")
     .lean();
-  const bookDocMap = new Map(bookDocs.map(b => [b._id.toString(), b]));
+  const bookDocMap = new Map(bookDocs.map((b) => [b._id.toString(), b]));
 
   // Tính số sao trung bình
   const ratingsData = await DanhGiaSach.aggregate([
     { $match: { MaSach: { $in: bookIds } } },
     {
       $group: {
-        _id: '$MaSach',
-        avgRating: { $avg: '$SoSao' },
-        totalRatings: { $sum: 1 }
-      }
-    }
+        _id: "$MaSach",
+        avgRating: { $avg: "$SoSao" },
+        totalRatings: { $sum: 1 },
+      },
+    },
   ]);
-  const ratingsMap = new Map(ratingsData.map(r => [r._id.toString(), {
-    avgRating: r.avgRating || 0,
-    totalRatings: r.totalRatings || 0
-  }]));
+  const ratingsMap = new Map(
+    ratingsData.map((r) => [
+      r._id.toString(),
+      {
+        avgRating: r.avgRating || 0,
+        totalRatings: r.totalRatings || 0,
+      },
+    ])
+  );
 
   // Gộp kết quả cuối
-  const finalResult = topSlice.map(item => {
+  const finalResult = topSlice.map((item) => {
     const doc = bookDocMap.get(item.bookIdStr);
-    const rating = ratingsMap.get(item.bookIdStr) || { avgRating: 0, totalRatings: 0 };
+    const rating = ratingsMap.get(item.bookIdStr) || {
+      avgRating: 0,
+      totalRatings: 0,
+    };
 
     return {
       _id: doc ? doc._id : mongoose.Types.ObjectId(item.bookIdStr),
       MaSach: doc ? doc.MaSach : null,
-      TenSach: doc ? doc.TenSach : '',
-      TacGia: doc ? doc.TacGia : '',
-      Image: doc ? doc.Image : '',
+      TenSach: doc ? doc.TenSach : "",
+      TacGia: doc ? doc.TacGia : "",
+      Image: doc ? doc.Image : "",
       views_7d: item.views_7d,
       borrows_7d: item.borrows_7d,
       ratings_7d: item.ratings_7d,
@@ -1413,7 +1510,7 @@ async function getTrendingBook(limit) {
       borrows_14d: item.borrows_14d,
       ratings_14d: item.ratings_14d,
       growth_rate: parseFloat(item.growth_rate.toFixed(3)),
-      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)) // giống getTodayBook
+      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)), // giống getTodayBook
     };
   });
 
@@ -1428,18 +1525,18 @@ async function getPopularBook(limit) {
 
   // Lấy tổng views cho mỗi sách
   const viewsAgg = await TheoDoiXemSach.aggregate([
-    { $group: { _id: '$MaSach', views: { $sum: 1 } } }
+    { $group: { _id: "$MaSach", views: { $sum: 1 } } },
   ]);
 
   // Lấy tổng borrows cho mỗi sách (chỉ tính approved + returned)
   const borrowsAgg = await TheoDoiMuonSach.aggregate([
-    { $match: { TrangThai: { $in: ['approved', 'returned'] } } },
-    { $group: { _id: '$MaSach', borrows: { $sum: 1 } } }
+    { $match: { TrangThai: { $in: ["approved", "returned"] } } },
+    { $group: { _id: "$MaSach", borrows: { $sum: 1 } } },
   ]);
 
   // Lấy tổng ratings cho mỗi sách
   const ratingsAgg = await DanhGiaSach.aggregate([
-    { $group: { _id: '$MaSach', ratings: { $sum: 1 } } }
+    { $group: { _id: "$MaSach", ratings: { $sum: 1 } } },
   ]);
 
   // Gom dữ liệu lại theo bookId
@@ -1452,17 +1549,17 @@ async function getPopularBook(limit) {
     return scoreMap.get(bookIdStr);
   }
 
-  viewsAgg.forEach(d => {
+  viewsAgg.forEach((d) => {
     const entry = ensureEntry(d._id.toString());
     entry.views = d.views || 0;
   });
 
-  borrowsAgg.forEach(d => {
+  borrowsAgg.forEach((d) => {
     const entry = ensureEntry(d._id.toString());
     entry.borrows = d.borrows || 0;
   });
 
-  ratingsAgg.forEach(d => {
+  ratingsAgg.forEach((d) => {
     const entry = ensureEntry(d._id.toString());
     entry.ratings = d.ratings || 0;
   });
@@ -1470,7 +1567,8 @@ async function getPopularBook(limit) {
   // Tính score cho từng sách
   const scoredBooks = [];
   for (const [bookIdStr, counts] of scoreMap.entries()) {
-    const score = (0.2 * counts.views) + (0.5 * counts.borrows) + (0.3 * counts.ratings);
+    const score =
+      0.2 * counts.views + 0.5 * counts.borrows + 0.3 * counts.ratings;
     scoredBooks.push({ bookIdStr, ...counts, score });
   }
 
@@ -1485,51 +1583,124 @@ async function getPopularBook(limit) {
   const topSlice = limit ? scoredBooks.slice(0, limit) : scoredBooks;
 
   // Lấy thông tin sách
-  const bookIds = topSlice.map(s => mongoose.Types.ObjectId(s.bookIdStr));
+  const bookIds = topSlice.map((s) => mongoose.Types.ObjectId(s.bookIdStr));
   const bookDocs = await Sach.find({ _id: { $in: bookIds } })
-    .select('MaSach TenSach TacGia Image DonGia')
+    .select("MaSach TenSach TacGia Image DonGia")
     .lean();
-  const bookDocMap = new Map(bookDocs.map(b => [b._id.toString(), b]));
+  const bookDocMap = new Map(bookDocs.map((b) => [b._id.toString(), b]));
 
   // Tính số sao trung bình
   const ratingsData = await DanhGiaSach.aggregate([
     { $match: { MaSach: { $in: bookIds } } },
     {
       $group: {
-        _id: '$MaSach',
-        avgRating: { $avg: '$SoSao' },
-        totalRatings: { $sum: 1 }
-      }
-    }
+        _id: "$MaSach",
+        avgRating: { $avg: "$SoSao" },
+        totalRatings: { $sum: 1 },
+      },
+    },
   ]);
-  const ratingsMap = new Map(ratingsData.map(r => [r._id.toString(), {
-    avgRating: r.avgRating || 0,
-    totalRatings: r.totalRatings || 0
-  }]));
+  const ratingsMap = new Map(
+    ratingsData.map((r) => [
+      r._id.toString(),
+      {
+        avgRating: r.avgRating || 0,
+        totalRatings: r.totalRatings || 0,
+      },
+    ])
+  );
 
   // Gộp kết quả cuối
-  const finalResult = topSlice.map(item => {
+  const finalResult = topSlice.map((item) => {
     const doc = bookDocMap.get(item.bookIdStr);
-    const rating = ratingsMap.get(item.bookIdStr) || { avgRating: 0, totalRatings: 0 };
+    const rating = ratingsMap.get(item.bookIdStr) || {
+      avgRating: 0,
+      totalRatings: 0,
+    };
 
     return {
       _id: doc ? doc._id : mongoose.Types.ObjectId(item.bookIdStr),
       MaSach: doc ? doc.MaSach : null,
-      TenSach: doc ? doc.TenSach : '',
-      TacGia: doc ? doc.TacGia : '',
-      Image: doc ? doc.Image : '',
-      DonGia: doc ? doc.DonGia : '',
+      TenSach: doc ? doc.TenSach : "",
+      TacGia: doc ? doc.TacGia : "",
+      Image: doc ? doc.Image : "",
+      DonGia: doc ? doc.DonGia : "",
       views: item.views,
       borrows: item.borrows,
       ratings: item.ratings,
       score: parseFloat(item.score.toFixed(3)), // làm tròn 3 chữ số thập phân
-      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)) // làm tròn 1 chữ số thập phân
+      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)), // làm tròn 1 chữ số thập phân
     };
   });
 
   return finalResult;
 }
 
+async function getBookPenaltyRule() {
+  try {
+    const rule = await QuyDinhPhatSach.findOne().sort({ updatedAt: -1 }).exec();
+    return rule;
+  } catch (error) {
+    console.error("Lỗi service: getBookPenaltyRule", error);
+    throw error;
+  }
+}
+
+async function updateBookPenaltyRule(ruleUpdates) {
+  try {
+    const updatedRule = await QuyDinhPhatSach.findOneAndUpdate(
+      {},
+      {
+        $set: {
+          ...ruleUpdates,
+          updatedAt: new Date(),
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
+
+    return updatedRule;
+  } catch (err) {
+    console.error("Lỗi service updateBookPenaltyRule:", err);
+    throw err;
+  }
+}
+
+async function getBookBorrowRule() {
+  try {
+    const rule = await QuyDinhMuonSach.findOne().sort({ updatedAt: -1 }).exec();
+    return rule;
+  } catch (error) {
+    console.error("Lỗi service: getBookBorrowRule", error);
+    throw error;
+  }
+}
+
+async function updateBookBorrowRule(ruleUpdates) {
+  try {
+    const updatedRule = await QuyDinhMuonSach.findOneAndUpdate(
+      {},
+      {
+        $set: {
+          ...ruleUpdates,
+          updatedAt: new Date(),
+        },
+      },
+      {
+        new: true, // trả về document sau khi update
+        upsert: true, // nếu chưa có thì tạo mới
+      }
+    );
+
+    return updatedRule;
+  } catch (err) {
+    console.error("❌ Lỗi service updateBookBorrowRule:", err);
+    throw err;
+  }
+}
 
 module.exports = {
   addBook,
@@ -1568,5 +1739,9 @@ module.exports = {
   deletePending,
   updateReturnStatus,
   confirmPaidCompensation,
-  updateOverdueFee
-}
+  updateOverdueFee,
+  getBookPenaltyRule,
+  updateBookPenaltyRule,
+  getBookBorrowRule,
+  updateBookBorrowRule,
+};

@@ -39,7 +39,11 @@ const
         deletePending,
         updateReturnStatus,
         confirmPaidCompensation,
-        updateOverdueFee
+        updateOverdueFee,
+        getBookPenaltyRule,
+        updateBookPenaltyRule,
+        getBookBorrowRule,
+        updateBookBorrowRule
     } = require('./book.controller')
 
 const router = express.Router()
@@ -89,4 +93,8 @@ router.get("/getTrendingBook", getTrendingBook);
 router.get("/getPopularBook", getPopularBook);
 router.get("/getPopularBookFilter", getPopularBookFilter);
 
+router.get("/getBookPenaltyRule", getBookPenaltyRule)
+router.post("/updateBookPenaltyRule", updateBookPenaltyRule)
+router.get("/getBookBorrowRule", getBookBorrowRule)
+router.post("/updateBookBorrowRule", updateBookBorrowRule)
 module.exports = router

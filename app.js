@@ -12,63 +12,6 @@ app.use("/api/library", require("./app/api/library/library.routes"));
 
 module.exports = app;
 
-//Auto check Phí quá hạn
-// const TheoDoiMuonSach = require("./app/models/theodoimuonsachModel");
-
-// function normalizeDate(date) {
-//   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-// }
-
-// (async () => {
-//   try {
-//     const now = new Date();
-//     const today = normalizeDate(now);
-
-//     // Lấy các record chưa thanh toán và quá hạn
-//     const overdueRecords = await TheoDoiMuonSach.find({
-//       DaThanhToan: false,
-//       NgayTra: { $lt: now },
-//     });
-
-//     let updatedCount = 0;
-
-//     for (const record of overdueRecords) {
-//       if (!record.NgayTra) continue;
-
-//       // ✅ tính hạn trả đến cuối ngày
-//       const dueDate = normalizeDate(new Date(record.NgayTra));
-//       dueDate.setDate(dueDate.getDate() + 1);
-
-//       const lastUpdate = record.NgayGhiNhanQuaHan
-//         ? normalizeDate(record.NgayGhiNhanQuaHan)
-//         : null;
-
-//       // Nếu hôm nay đã cập nhật rồi thì bỏ qua
-//       if (lastUpdate && lastUpdate.getTime() === today.getTime()) continue;
-
-//       // ✅ Tính số ngày trễ
-//       const daysLate = Math.max(
-//         0,
-//         Math.floor((today - dueDate) / (1000 * 60 * 60 * 24)) + 1
-//       );
-
-//       record.PhiQuaHan = daysLate * 5000 * record.SoLuong;
-//       record.NgayGhiNhanQuaHan = now;
-
-//       await record.save();
-//       updatedCount++;
-//     }
-
-//     if (updatedCount > 0) {
-//       console.log(`✅ Cập nhật phí quá hạn xong, tổng: ${updatedCount} record`);
-//     } else {
-//       console.log("Hôm nay đã cập nhật phí quá hạn rồi");
-//     }
-//   } catch (err) {
-//     console.error("❌ Lỗi cập nhật phí quá hạn:", err.message);
-//   }
-// })();
-
 // Auto check hạn của thẻ thư viện
 const TheThuVien = require("./app/models/thethuvienModel");
 const ThongTinGiaHan = require("./app/models/thongtingiahanModel");
@@ -115,6 +58,66 @@ function normalizeDate(date) {
     console.error("❌ Lỗi khi kiểm tra thẻ hết hạn:", err.message);
   }
 })();
+
+
+const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel');
+const QuyDinhMuonSach = require('./app/models/quydinhmuonsachModel');
+const { updateBorrowStatus } = require('./app/api/book/book.service'); // import đúng hàm của bạn
+
+(async () => {
+  try {
+    const quyDinh = await QuyDinhMuonSach.findOne({});
+    const pickupDeadlineDays = (quyDinh && quyDinh.pickupDeadline) || 3;
+
+    // Lấy tất cả yêu cầu đang ở trạng thái processing
+    const processingRequests = await TheoDoiMuonSach.find({ TrangThai: 'processing' });
+
+    const now = new Date();
+    let hasLate = false;
+
+    for (const request of processingRequests) {
+      if (!request.NgayDuyet) continue; // nếu chưa có NgayDuyet, bỏ qua
+
+      // Tính số ngày đã trôi qua kể từ NgayDuyet
+      const diffTime = now.getTime() - request.NgayDuyet.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+      if (diffDays > pickupDeadlineDays) {
+        // Quá hạn pickupDeadline → chuyển sang denied
+        await updateBorrowStatus(request._id, null, 'denied'); // adminId null vì tự động
+        console.log(`Yêu cầu ${request._id} đã quá hạn nhận sách, chuyển sang denied`);
+        hasLate = true;
+      }
+    }
+
+    if (!hasLate) {
+      console.log('✅ Không có yêu cầu mượn nào quá hạn nhận sách.');
+    }
+  } catch (err) {
+    console.error('Lỗi khi kiểm tra tự động pickupDeadline:', err);
+  }
+})();
+
+
+// const QuyDinhMuonSach = require('./app/models/quydinhmuonsachModel'); 
+
+// (async () => {
+//   try {
+//     // tạo dữ liệu mẫu (giống default trong schema)
+//     const rule = await QuyDinhMuonSach.create({
+//       maxBooks: 6,          // Số sách được mượn tối đa
+//       maxBooksPerDay: 3,    // Số sách được mượn tối đa trong ngày
+//       borrowDuration: 7,    // Số ngày mượn tối đa
+//     });
+
+//     console.log("✅ Đã tạo quy định mượn sách:");
+//     console.log(
+//       `maxBooks: ${rule.maxBooks} | maxBooksPerDay: ${rule.maxBooksPerDay} | borrowDuration: ${rule.borrowDuration} ngày`
+//     );
+//   } catch (err) {
+//     console.error("❌ Lỗi:", err.message);
+//   }
+// })();
 
 // const DocGia = require('./app/models/docgiaModel'); // chỉnh lại đường dẫn nếu khác
 // (async () => {

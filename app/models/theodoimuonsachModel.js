@@ -5,6 +5,12 @@ const TheoDoiMuonSachSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  
+  NgayDuyet: {
+    type: Date,
+    required: false,
+    default: null
+  },
 
   NgayMuon: {
     type: Date,
@@ -33,6 +39,7 @@ const TheoDoiMuonSachSchema = new mongoose.Schema({
     type: String,
     enum: [
       'pending',    // Chờ duyệt
+      'processing', // Đã duyệt đăng ký, chờ sinh viên đến lấy
       'approved',   // Đã duyệt
       'denied',     // Bị từ chối
       'returned',   // Đã trả
