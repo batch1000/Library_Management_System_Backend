@@ -83,6 +83,11 @@ const TheoDoiMuonSachSchema = new mongoose.Schema({
     default: null
   },
 
+  DaSua: {
+    type: Boolean,
+    default: false
+  },
+
   MaSach: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Sach',

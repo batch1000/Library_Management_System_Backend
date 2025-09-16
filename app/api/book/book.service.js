@@ -500,10 +500,12 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
       updateFields.DaThanhToan = false;
     }
 
-    if (bookCondition !== "Mất sách") {
+    if (bookCondition === "Nguyên vẹn") {
       updateFields.NgayGhiNhanTra = now;
       sach.SoQuyen += request.SoLuong;
       await sach.save();
+    } else if (bookCondition === "Hư sách") {
+      updateFields.NgayGhiNhanTra = now;
     }
 
     const updated = await TheoDoiMuonSach.findByIdAndUpdate(
@@ -537,6 +539,44 @@ async function confirmPaidCompensation(requestId) {
     return updated;
   } catch (err) {
     console.error("Lỗi khi cập nhật trạng thái thanh toán:", err);
+    throw err;
+  }
+}
+
+async function confirmRepaired(requestId) {
+  try {
+    // Tìm bản ghi theo dõi mượn sách
+    const borrowRecord = await TheoDoiMuonSach.findById(requestId).populate('MaSach');
+    
+    if (!borrowRecord) {
+      throw new Error("Không tìm thấy bản ghi mượn sách");
+    }
+
+    // Kiểm tra xem sách có phải là "Hư sách" không
+    if (borrowRecord.TinhTrangSach !== 'Hư sách') {
+      throw new Error("Chỉ có thể xác nhận sửa cho sách có tình trạng 'Hư sách'");
+    }
+
+    // Cập nhật trạng thái đã sửa
+    const updated = await TheoDoiMuonSach.findByIdAndUpdate(
+      requestId,
+      {
+        DaSua: true
+      },
+      { new: true }
+    );
+
+    // Cộng thêm 1 vào số quyển sách (vì sách đã được sửa, có thể cho mượn lại)
+    await Sach.findByIdAndUpdate(
+      borrowRecord.MaSach._id,
+      {
+        $inc: { SoQuyen: 1 }
+      }
+    );
+
+    return updated;
+  } catch (err) {
+    console.error("Lỗi khi cập nhật trạng thái đã sửa:", err);
     throw err;
   }
 }
@@ -1744,4 +1784,5 @@ module.exports = {
   updateBookPenaltyRule,
   getBookBorrowRule,
   updateBookBorrowRule,
+  confirmRepaired
 };

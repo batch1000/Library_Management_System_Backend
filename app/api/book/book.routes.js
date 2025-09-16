@@ -43,7 +43,8 @@ const
         getBookPenaltyRule,
         updateBookPenaltyRule,
         getBookBorrowRule,
-        updateBookBorrowRule
+        updateBookBorrowRule,
+        confirmRepaired
     } = require('./book.controller')
 
 const router = express.Router()
@@ -65,6 +66,7 @@ router.get('/getTrackBorrowBook', getTrackBorrowBook);
 router.post('/updateBorrowStatus', updateBorrowStatus);
 router.post('/updateReturnStatus', updateReturnStatus);
 router.post('/confirmPaidCompensation', confirmPaidCompensation);
+router.post('/confirmRepaired', confirmRepaired);
 router.post('/updateOverdueFee', updateOverdueFee);
 router.post('/extendBorrowTime', extendBorrowTime);
 router.post('/countCurrentBorrowing', countCurrentBorrowing);

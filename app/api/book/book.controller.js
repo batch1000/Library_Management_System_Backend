@@ -317,6 +317,23 @@ async function confirmPaidCompensation(req, res) {
   }
 }
 
+async function confirmRepaired(req, res) {
+  try {
+    const { requestId } = req.body;
+
+    if (!requestId) {
+      return res.status(400).send("Thiếu thông tin cần thiết");
+    }
+
+    const updated = await bookService.confirmRepaired(requestId);
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Lỗi khi cập nhật trạng thái sửa sách:", error);
+    res.status(500).send("Cập nhật trạng thái sửa sách");
+  }
+}
+
 async function updateOverdueFee(req, res) {
   try {
     const { requestId } = req.body;
@@ -845,5 +862,6 @@ module.exports = {
   getBookPenaltyRule,
   updateBookPenaltyRule,
   getBookBorrowRule,
-  updateBookBorrowRule
+  updateBookBorrowRule,
+  confirmRepaired
 };
