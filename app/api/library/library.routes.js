@@ -4,7 +4,8 @@ const
     {   
         getLibraryCard,
         getAllInfoExpireCard,
-        renewLibraryCard
+        renewLibraryCard,
+        updateAvatar
     } = require('./library.controller')
 
 const router = express.Router();
@@ -12,5 +13,6 @@ const router = express.Router();
 router.post('/getLibraryCard', getLibraryCard);
 router.get('/getAllInfoExpireCard', getAllInfoExpireCard);
 router.post('/renewLibraryCard', renewLibraryCard);
+router.post('/updateAvatar', upload.single('image'), updateAvatar);
 
 module.exports = router;

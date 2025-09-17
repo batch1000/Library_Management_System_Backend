@@ -193,9 +193,25 @@ async function renewLibraryCard(cardId) {
   }
 }
 
+async function updateAvatar(studentId, imageUrl) {
+  try {
+    const updated = await SinhVien.findByIdAndUpdate(
+      studentId,
+      { Avatar: imageUrl },
+      { new: true }
+    );
+
+    return updated;
+  } catch (err) {
+    console.error("Lỗi service updateAvatar:", err);
+    throw err;
+  }
+}
+
 module.exports = {
   getLibraryCard,
   createLibraryCard,
   getAllInfoExpireCard,
   renewLibraryCard,
+  updateAvatar
 };
