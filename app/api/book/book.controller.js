@@ -803,14 +803,15 @@ async function getBookBorrowRule(req, res) {
 
 async function updateBookBorrowRule(req, res) {
   try {
-    const { maxBooks, maxBooksPerDay, borrowDuration, pickupDeadline } = req.body;
+    const { maxBooks, maxBooksPerDay, borrowDuration, pickupDeadline, renewalDuration } = req.body;
 
     // gọi service để update
     const updatedRule = await bookService.updateBookBorrowRule({
       maxBooks,
       maxBooksPerDay,
       borrowDuration,
-      pickupDeadline
+      pickupDeadline,
+      renewalDuration
     });
 
     res.status(200).json(updatedRule);

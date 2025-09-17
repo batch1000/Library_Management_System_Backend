@@ -5,6 +5,7 @@ const quyDinhMuonSachSchema = new mongoose.Schema({
   maxBooksPerDay: { type: Number, default: 3 }, // Số sách được mượn tối đa trong ngày
   borrowDuration: { type: Number, default: 7 }, // Số ngày mượn tối đa (mặc định 7 ngày)
   pickupDeadline: { type: Number, default: 3 }, // Hạn nhận sách (số ngày kể từ lúc duyệt yêu cầu)
+  renewalDuration: { type: Number, default: 3 },
   updatedAt: { type: Date, default: Date.now },
 });
 
