@@ -8,17 +8,18 @@ const Lop = require("../../models/lopModel");
 const DocGia = require("../../models/docgiaModel");
 const TheThuVien = require("../../models/thethuvienModel");
 const ThongTinGiaHan = require("../../models/thongtingiahanModel");
+const ThongTinCapLaiThe = require("../../models/thongtincaplaitheModel");
+const QuyDinhThuVien = require("../../models/quydinhthuvienModel");
 
 async function getLibraryCard(MaDocGia) {
   try {
     if (!MaDocGia) throw new Error("Chưa cung cấp MaDocGia");
 
     // 1. Tìm thẻ thư viện theo DocGia
-    const card = await TheThuVien.findOne({ DocGia: MaDocGia })
-      .populate({
-        path: "DocGia",
-        select: "HoTen CMND",
-      });
+    const card = await TheThuVien.findOne({ DocGia: MaDocGia }).populate({
+      path: "DocGia",
+      select: "HoTen CMND",
+    });
 
     if (!card) {
       return { message: "Không tìm thấy thẻ thư viện" };
@@ -38,8 +39,9 @@ async function getLibraryCard(MaDocGia) {
       .populate("MaNienKhoa", "TenNienKhoa");
 
     // 3. Lấy toàn bộ lịch sử gia hạn của thẻ
-    const history = await ThongTinGiaHan.find({ MaThe: card._id })
-      .sort({ NgayGiaHan: -1 }); // mới nhất trước
+    const history = await ThongTinGiaHan.find({ MaThe: card._id }).sort({
+      NgayGiaHan: -1,
+    }); // mới nhất trước
 
     // Chuẩn hóa dữ liệu giống bên admin
     const extendHistory = history.map((item) => ({
@@ -47,10 +49,27 @@ async function getLibraryCard(MaDocGia) {
       PhiGiaHan: item.PhiGiaHan,
     }));
 
+    // 4. Lấy toàn bộ lịch sử cấp lại thẻ
+    const reissueHistory = await ThongTinCapLaiThe.find({
+      MaThe: card._id,
+    }).sort({
+      NgayYeuCau: -1,
+    });
+
+    // Chuẩn hóa dữ liệu giống bên admin
+    const reissueList = reissueHistory.map((item) => ({
+      NgayYeuCau: item.NgayYeuCau,
+      NgayDuyet: item.NgayDuyet,
+      NgayCapLai: item.NgayCapLai,
+      PhiCapLai: item.PhiCapLai,
+      TrangThai: item.TrangThai,
+    }));
+
     return {
       cardInfo: card || null,
       studentInfo: student || null,
-      extendHistory, // luôn trả về mảng (có thể rỗng nếu chưa gia hạn lần nào)
+      extendHistory,
+      reissueHistory: reissueList,
     };
   } catch (error) {
     console.error("Lỗi trong service getLibraryCard:", error);
@@ -104,8 +123,6 @@ async function createLibraryCard(DocGiaId) {
 
 async function getAllInfoExpireCard() {
   try {
-    const today = new Date();
-
     const info = await ThongTinGiaHan.find()
       .populate({
         path: "MaThe",
@@ -116,38 +133,37 @@ async function getAllInfoExpireCard() {
       })
       .sort({ NgayGiaHan: 1 });
 
+    // Gom nhóm theo thẻ
     const grouped = {};
     for (const item of info) {
       const card = item.MaThe;
       if (!card) continue;
 
-      if (card.NgayHetHan < today || card.TrangThai === "Hết hạn") {
-        if (!grouped[card._id]) {
-          let student = null;
-          if (card.DocGia && card.DocGia._id) {
-            student = await SinhVien.findOne({ MaDocGia: card.DocGia._id })
-              .populate("MaLop", "TenLop")
-              .populate({
-                path: "MaNganhHoc",
-                select: "TenNganh Khoa",
-                populate: { path: "Khoa", select: "TenKhoa" },
-              })
-              .populate("MaNienKhoa", "TenNienKhoa");
-          }
-
-          grouped[card._id] = {
-            cardInfo: card,
-            studentInfo: student,
-            extendHistory: [],
-          };
+      if (!grouped[card._id]) {
+        let student = null;
+        if (card.DocGia && card.DocGia._id) {
+          student = await SinhVien.findOne({ MaDocGia: card.DocGia._id })
+            .populate("MaLop", "TenLop")
+            .populate({
+              path: "MaNganhHoc",
+              select: "TenNganh Khoa",
+              populate: { path: "Khoa", select: "TenKhoa" },
+            })
+            .populate("MaNienKhoa", "TenNienKhoa");
         }
 
-        // ✅ Luôn thêm vào lịch sử (kể cả khi NgayGiaHan = null)
-        grouped[card._id].extendHistory.push({
-          NgayGiaHan: item.NgayGiaHan, // có thể null
-          PhiGiaHan: item.PhiGiaHan,
-        });
+        grouped[card._id] = {
+          cardInfo: card,
+          studentInfo: student,
+          extendHistory: [],
+        };
       }
+
+      // Luôn thêm lịch sử (kể cả NgayGiaHan = null)
+      grouped[card._id].extendHistory.push({
+        NgayGiaHan: item.NgayGiaHan,
+        PhiGiaHan: item.PhiGiaHan,
+      });
     }
 
     return Object.values(grouped);
@@ -208,10 +224,227 @@ async function updateAvatar(studentId, imageUrl) {
   }
 }
 
+async function requestCardReprint(MaThe) {
+  try {
+    const rule = await QuyDinhThuVien.findOne();
+    let reissueFee = 50000;
+
+    if (rule && rule.reissueFee) {
+      reissueFee = rule.reissueFee;
+    }
+
+    const request = await ThongTinCapLaiThe.create({
+      MaThe,
+      TrangThai: "pending",
+      NgayCapLai: null, // chưa cấp lại
+      NgayYeuCau: new Date(),
+      PhiCapLai: reissueFee, // nếu muốn, có thể để 0
+    });
+
+    return request;
+  } catch (err) {
+    console.error("Lỗi tạo yêu cầu in lại thẻ:", err);
+    throw err;
+  }
+}
+
+async function getStatusCardReprint(MaThe) {
+  try {
+    // tìm bản ghi in lại thẻ gần nhất của thẻ này
+    const request = await ThongTinCapLaiThe.findOne({ MaThe })
+      .sort({ createdAt: -1 }) // lấy bản ghi mới nhất
+      .select("TrangThai NgayCapLai PhiCapLai createdAt");
+
+    // nếu chưa có yêu cầu in lại nào
+    if (!request) {
+      return { TrangThai: "no_request" };
+    }
+
+    return request;
+  } catch (err) {
+    console.error("Lỗi lấy trạng thái in lại thẻ:", err);
+    throw err;
+  }
+}
+
+async function getAllInfoRenewCard() {
+  try {
+    const info = await ThongTinCapLaiThe.find()
+      .populate({
+        path: "MaThe",
+        populate: {
+          path: "DocGia",
+          select: "HoLot Ten DoiTuong",
+        },
+      })
+      .sort({ NgayCapLai: -1 });
+
+    // Gom nhóm theo thẻ
+    const grouped = {};
+    for (const item of info) {
+      const card = item.MaThe;
+      if (!card) continue;
+
+      if (!grouped[card._id]) {
+        let student = null;
+        if (card.DocGia && card.DocGia._id) {
+          student = await SinhVien.findOne({ MaDocGia: card.DocGia._id })
+            .populate("MaLop", "TenLop")
+            .populate({
+              path: "MaNganhHoc",
+              select: "TenNganh Khoa",
+              populate: { path: "Khoa", select: "TenKhoa" },
+            })
+            .populate("MaNienKhoa", "TenNienKhoa");
+        }
+
+        grouped[card._id] = {
+          cardInfo: card,
+          studentInfo: student,
+          reissueHistory: [], // lịch sử cấp lại thẻ
+        };
+      }
+
+      // Luôn thêm lịch sử (kể cả NgayCapLai = null)
+      grouped[card._id].reissueHistory.push({
+        NgayYeuCau: item.NgayYeuCau,
+        NgayDuyet: item.NgayDuyet,
+        NgayCapLai: item.NgayCapLai,
+        PhiCapLai: item.PhiCapLai,
+        TrangThai: item.TrangThai,
+      });
+    }
+
+    return Object.values(grouped);
+  } catch (error) {
+    console.error("Lỗi trong service getAllInfoRenewCard:", error);
+    throw error;
+  }
+}
+
+async function approveReissueCard(maThe) {
+  try {
+    // tìm yêu cầu mới nhất theo MaThe
+    const request = await ThongTinCapLaiThe.findOneAndUpdate(
+      { MaThe: maThe },
+      {
+        TrangThai: "approve",
+        NgayDuyet: new Date(),
+      },
+      {
+        new: true,
+        sort: { createdAt: -1 }, // lấy bản ghi mới nhất
+      }
+    );
+
+    if (!request) {
+      throw new Error("Không tìm thấy yêu cầu cấp lại thẻ");
+    }
+
+    return request;
+  } catch (err) {
+    console.error("Lỗi duyệt yêu cầu cấp lại thẻ:", err);
+    throw err;
+  }
+}
+
+async function printCard(maThe) {
+  try {
+    // tìm yêu cầu mới nhất theo MaThe và cập nhật thành printed
+    const request = await ThongTinCapLaiThe.findOneAndUpdate(
+      { MaThe: maThe, TrangThai: "approve" }, // chỉ in khi đã duyệt
+      {
+        TrangThai: "printed",
+        NgayCapLai: new Date(),
+      },
+      {
+        new: true,
+        sort: { createdAt: -1 }, // lấy bản ghi mới nhất
+      }
+    );
+
+    if (!request) {
+      throw new Error("Không tìm thấy yêu cầu in lại thẻ hợp lệ");
+    }
+
+    return request;
+  } catch (err) {
+    console.error("Lỗi in lại thẻ:", err);
+    throw err;
+  }
+}
+
+async function denyReissueCard(maThe) {
+  try {
+    // tìm yêu cầu mới nhất theo MaThe và cập nhật thành "denied"
+    const request = await ThongTinCapLaiThe.findOneAndUpdate(
+      { MaThe: maThe },
+      {
+        TrangThai: "denied",
+      },
+      {
+        new: true,
+        sort: { createdAt: -1 }, // lấy bản ghi mới nhất
+      }
+    );
+
+    if (!request) {
+      throw new Error("Không tìm thấy yêu cầu cấp lại thẻ");
+    }
+
+    return request;
+  } catch (err) {
+    console.error("Lỗi từ chối yêu cầu cấp lại thẻ:", err);
+    throw err;
+  }
+}
+
+async function getCardRule() {
+  try {
+    const rule = await QuyDinhThuVien.findOne().sort({ updatedAt: -1 }).exec();
+    return rule;
+  } catch (error) {
+    console.error("Lỗi service: getCardRule", error);
+    throw error;
+  }
+}
+
+async function updateCardRule(ruleUpdates) {
+  try {
+    const updatedRule = await QuyDinhThuVien.findOneAndUpdate(
+      {},
+      {
+        $set: {
+          ...ruleUpdates,
+          updatedAt: new Date(),
+        },
+      },
+      {
+        new: true,   // trả về document sau khi update
+        upsert: true // nếu chưa có thì tạo mới
+      }
+    );
+
+    return updatedRule;
+  } catch (err) {
+    console.error("❌ Lỗi service updateCardRule:", err);
+    throw err;
+  }
+}
+
+
 module.exports = {
   getLibraryCard,
   createLibraryCard,
   getAllInfoExpireCard,
   renewLibraryCard,
-  updateAvatar
+  updateAvatar,
+  requestCardReprint,
+  getStatusCardReprint,
+  getAllInfoRenewCard,
+  approveReissueCard,
+  printCard,
+  denyReissueCard,
+  getCardRule,
+  updateCardRule
 };

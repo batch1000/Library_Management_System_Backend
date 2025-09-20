@@ -15,6 +15,7 @@ module.exports = app;
 // Auto check hạn của thẻ thư viện
 const TheThuVien = require("./app/models/thethuvienModel");
 const ThongTinGiaHan = require("./app/models/thongtingiahanModel");
+const QuyDinhThuVien = require("./app/models/quydinhthuvienModel");
 
 function normalizeDate(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -34,6 +35,12 @@ function normalizeDate(date) {
 
     let updatedCount = 0;
 
+    const rule = await QuyDinhThuVien.findOne();
+    let renewalFee = 25000; // fallback mặc định
+    if (rule && rule.renewalFee) {
+      renewalFee = rule.renewalFee;
+    }
+
     for (const card of expiredCards) {
       card.TrangThai = "Hết hạn";
       card.NgayKiemTraHetHan = now; // ghi lại ngày đã check
@@ -41,7 +48,7 @@ function normalizeDate(date) {
 
       await ThongTinGiaHan.create({
         MaThe: card._id,
-        PhiGiaHan: 25000, // giả sử phí cố định
+        PhiGiaHan: renewalFee, // giả sử phí cố định
       });
 
       updatedCount++;
@@ -52,17 +59,68 @@ function normalizeDate(date) {
         `✅ Đã cập nhật trạng thái "Hết hạn" cho ${updatedCount} thẻ`
       );
     } else {
-      console.log("Hôm nay đã kiểm tra thẻ hết hạn rồi");
+      console.log("✅ Hôm nay đã kiểm tra thẻ hết hạn rồi");
     }
   } catch (err) {
     console.error("❌ Lỗi khi kiểm tra thẻ hết hạn:", err.message);
   }
 })();
 
+// Auto check quá hạn in thẻ
+const ThongTinCapLaiThe = require("./app/models/thongtincaplaitheModel");
 
-const TheoDoiMuonSach = require('./app/models/theodoimuonsachModel');
-const QuyDinhMuonSach = require('./app/models/quydinhmuonsachModel');
-const { updateBorrowStatus } = require('./app/api/book/book.service'); // import đúng hàm của bạn
+function normalizeDate(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+(async () => {
+  try {
+    const quyDinh = await QuyDinhThuVien.findOne({});
+    const printWaitingDays = (quyDinh && quyDinh.printWaitingDays) || 3;
+
+    // Lấy tất cả yêu cầu cấp lại thẻ đã được duyệt nhưng chưa in
+    const approvedRequests = await ThongTinCapLaiThe.find({
+      TrangThai: "approve",
+      NgayDuyet: { $ne: null },
+    });
+
+    const today = normalizeDate(new Date());
+    let hasLate = false;
+
+    for (const request of approvedRequests) {
+      const ngayDuyet = normalizeDate(request.NgayDuyet);
+
+      const diffTime = today.getTime() - ngayDuyet.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+      if (diffDays > printWaitingDays) {
+        // Quá hạn chờ in thẻ → chuyển sang denied
+        request.TrangThai = "denied";
+        await request.save();
+
+        console.log(
+          `Yêu cầu cấp lại thẻ ${request._id} đã quá hạn in, chuyển sang denied`
+        );
+        hasLate = true;
+      }
+    }
+
+    if (!hasLate) {
+      console.log("✅ Không có yêu cầu cấp lại thẻ nào quá hạn in.");
+    }
+  } catch (err) {
+    console.error("Lỗi khi kiểm tra tự động printWaitingDays:", err);
+  }
+})();
+
+//Auto check quá hạn nhận sách
+const TheoDoiMuonSach = require("./app/models/theodoimuonsachModel");
+const QuyDinhMuonSach = require("./app/models/quydinhmuonsachModel");
+const { updateBorrowStatus } = require("./app/api/book/book.service"); 
+
+function normalizeDate(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
 
 (async () => {
   try {
@@ -70,36 +128,78 @@ const { updateBorrowStatus } = require('./app/api/book/book.service'); // import
     const pickupDeadlineDays = (quyDinh && quyDinh.pickupDeadline) || 3;
 
     // Lấy tất cả yêu cầu đang ở trạng thái processing
-    const processingRequests = await TheoDoiMuonSach.find({ TrangThai: 'processing' });
+    const processingRequests = await TheoDoiMuonSach.find({
+      TrangThai: "processing",
+      NgayDuyet: { $ne: null },
+    });
 
-    const now = new Date();
+    const today = normalizeDate(new Date());
     let hasLate = false;
 
     for (const request of processingRequests) {
-      if (!request.NgayDuyet) continue; // nếu chưa có NgayDuyet, bỏ qua
+      const ngayDuyet = normalizeDate(request.NgayDuyet);
 
-      // Tính số ngày đã trôi qua kể từ NgayDuyet
-      const diffTime = now.getTime() - request.NgayDuyet.getTime();
+      const diffTime = today.getTime() - ngayDuyet.getTime();
       const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
       if (diffDays > pickupDeadlineDays) {
         // Quá hạn pickupDeadline → chuyển sang denied
-        await updateBorrowStatus(request._id, null, 'denied'); // adminId null vì tự động
-        console.log(`Yêu cầu ${request._id} đã quá hạn nhận sách, chuyển sang denied`);
+        await updateBorrowStatus(request._id, null, "denied"); // adminId null vì tự động
+        console.log(
+          `Yêu cầu ${request._id} đã quá hạn nhận sách, chuyển sang denied`
+        );
         hasLate = true;
       }
     }
 
     if (!hasLate) {
-      console.log('✅ Không có yêu cầu mượn nào quá hạn nhận sách.');
+      console.log("✅ Không có yêu cầu mượn nào quá hạn nhận sách.");
     }
   } catch (err) {
-    console.error('Lỗi khi kiểm tra tự động pickupDeadline:', err);
+    console.error("Lỗi khi kiểm tra tự động pickupDeadline:", err);
   }
 })();
 
+// Auto check sách mượn quá hạn
+function normalizeDate(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
 
-// const QuyDinhMuonSach = require('./app/models/quydinhmuonsachModel'); 
+(async () => {
+  try {
+    const now = new Date();
+    const today = normalizeDate(now);
+
+    // Lấy các lượt mượn đã duyệt, chưa được check hôm nay
+    const overdueBorrows = await TheoDoiMuonSach.find({
+      TrangThai: "approved",
+      NgayTra: { $lt: today },
+      $or: [
+        { NgayCapNhatTinhTrangSach: null },
+        { NgayCapNhatTinhTrangSach: { $lt: today } },
+      ],
+    });
+
+    let updatedCount = 0;
+
+    for (const borrow of overdueBorrows) {
+      borrow.TrangThai = "overdue";
+      borrow.NgayCapNhatTinhTrangSach = now; // ghi nhận ngày đã check
+      await borrow.save();
+      updatedCount++;
+    }
+
+    if (updatedCount > 0) {
+      console.log(`✅ Đã chuyển ${updatedCount} lượt mượn sang trạng thái "overdue"`);
+    } else {
+      console.log("✅ Hôm nay đã kiểm tra quá hạn rồi, không có gì để cập nhật");
+    }
+  } catch (err) {
+    console.error("❌ Lỗi khi auto check quá hạn:", err.message);
+  }
+})();
+
+// const QuyDinhMuonSach = require('./app/models/quydinhmuonsachModel');
 
 // (async () => {
 //   try {

@@ -67,9 +67,112 @@ async function updateAvatar(req, res) {
   }
 }
 
+async function requestCardReprint(req, res) {
+  try {
+    const { MaThe } = req.body;
+    const result = await libraryService.requestCardReprint(MaThe);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi yêu cầu in lại thẻ thư viện:", error);
+    res.status(500).send("Yêu cầu in lại thẻ thư viện thất bại");
+  }
+}
+
+async function getStatusCardReprint(req, res) {
+  try {
+    const { MaThe } = req.body;
+    const result = await libraryService.getStatusCardReprint(MaThe);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy trạng thái in lại thẻ thư viện:", error);
+    res.status(500).send("Yêu cầu lấy trạng thái in lại thẻ thư viện thất bại");
+  }
+}
+
+async function getAllInfoRenewCard(req, res) {
+  try {
+    const info = await libraryService.getAllInfoRenewCard();
+    // console.log(JSON.stringify(info, null, 2));
+    res.json(info);
+  } catch (error) {
+    console.error("Lỗi khi lấy thông tin in lại thẻ thư viện:", error);
+    res.status(500).send("Lấy thông tin in lại thẻ thư viện thất bại");
+  }
+}
+
+async function approveReissueCard(req, res) {
+  try {
+    const { cardId } = req.body; 
+    const result = await libraryService.approveReissueCard(cardId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi duyệt yêu cầu cấp lại thẻ:", error);
+    res.status(500).send("Duyệt yêu cầu cấp lại thẻ thất bại");
+  }
+}
+
+async function printCard(req, res) {
+  try {
+    const { cardId } = req.body;
+
+    const result = await libraryService.printCard(cardId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi in lại thẻ:", error);
+    res.status(500).send("In lại thẻ thất bại");
+  }
+}
+
+async function denyReissueCard(req, res) {
+  try {
+    const { cardId } = req.body;
+    const result = await libraryService.denyReissueCard(cardId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi từ chối yêu cầu cấp lại thẻ:", error);
+    res.status(500).send("Từ chối yêu cầu cấp lại thẻ thất bại");
+  }
+}
+
+async function getCardRule(req, res) {
+  try {
+    const rule = await libraryService.getCardRule();
+    return res.status(200).json(rule);
+  } catch (error) {
+    console.error("Lỗi khi lấy quy định thẻ thư viện:", error);
+    throw error;
+  }
+}
+
+async function updateCardRule(req, res) {
+  try {
+    const { renewalFee, reissueFee, printWaitingDays } = req.body;
+
+    // gọi service để update
+    const updatedRule = await libraryService.updateCardRule({
+      renewalFee,
+      reissueFee,
+      printWaitingDays
+    });
+
+    res.status(200).json(updatedRule);
+  } catch (error) {
+    console.error("❌ Lỗi khi cập nhật quy định thẻ thư viện:", error);
+    res.status(500).json({ message: "Lỗi server khi cập nhật quy định thẻ thư viện" });
+  }
+}
+
 module.exports = {
   getLibraryCard,
   getAllInfoExpireCard,
   renewLibraryCard,
   updateAvatar,
+  requestCardReprint,
+  getStatusCardReprint,
+  getAllInfoRenewCard,
+  approveReissueCard,
+  printCard,
+  denyReissueCard,
+  getCardRule,
+  updateCardRule
 };

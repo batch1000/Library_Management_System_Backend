@@ -6,6 +6,12 @@ const ThongTinCapLaiTheSchema = new mongoose.Schema({
         ref: 'TheThuVien',
         required: true
     },
+    NgayYeuCau: {
+        type: Date
+    },
+    NgayDuyet: {
+        type: Date
+    },
     PhiCapLai: {
         type: Number,
         required: true,
@@ -13,6 +19,11 @@ const ThongTinCapLaiTheSchema = new mongoose.Schema({
     },
     NgayCapLai: {
         type: Date
+    },
+    TrangThai: {
+        type: String,
+        enum: ['pending', 'approve', 'denied', 'printed'],
+        default: 'pending'
     },
 }, {
     timestamps: true
