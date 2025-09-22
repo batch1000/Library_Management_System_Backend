@@ -4,6 +4,7 @@ const TaiKhoan = require('../../models/taikhoanModel');
 const DocGia = require('../../models/docgiaModel');
 const NhanVien = require('../../models/nhanvienModel');
 const TheoDoiMuonSach = require('../../models/theodoimuonsachModel');
+const TheThuVien = require('../../models/thethuvienModel');
 
 async function generateMaDocGia() {
   const latestDocGia = await DocGia.findOne().sort({ createdAt: -1 }).exec();
@@ -61,10 +62,14 @@ async function login(data) {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return null;
 
+    // Lấy thẻ thư viện
+    const card = await TheThuVien.findOne({ DocGia: user.MaDocGia._id });
+
     return {
       _id: user.MaDocGia._id,
       role: "User",
-      hoTen: `${user.MaDocGia.HoLot} ${user.MaDocGia.Ten}`
+      hoTen: `${user.MaDocGia.HoLot} ${user.MaDocGia.Ten}`,
+      cardStatus: card.TrangThai || null,
     };
   }
 

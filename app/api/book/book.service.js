@@ -115,27 +115,30 @@ async function getBookById(id) {
 
 async function addBook(data) {
   try {
-    let nxb = await NhaXuatBan.findOne({ TenNXB: data.NhaXuatBan }).exec();
-
+    // Xử lý nhà xuất bản
+    let nxb = await NhaXuatBan.findOne({ TenNXB: data.TenNXB }).exec();
     if (!nxb) {
       const maNXB = await generateMaNXB();
       nxb = await NhaXuatBan.create({
         MaNXB: maNXB,
-        TenNXB: data.NhaXuatBan,
-        DiaChi: data.DiaChiNhaXuatBan,
+        TenNXB: data.TenNXB,
+        DiaChi: data.DiaChiNXB || "",
       });
     }
 
+    // Xử lý thể loại
     const theLoai = await TheLoaiSach.findOne({
-      TenTheLoai: data.TheLoai,
+      TenTheLoai: data.TenTheLoai,
     }).exec();
     if (!theLoai) {
-      throw new Error(`Thể loại "${data.TheLoai}" không tồn tại`);
+      throw new Error(`Thể loại "${data.TenTheLoai}" không tồn tại`);
     }
 
+    // Tạo mã sách
     const maSach = await generateMaSach();
 
-    const newBook = await Sach.create({
+    // Tạo sách mới
+    const newBook = new Sach({
       MaSach: maSach,
       TenSach: data.TenSach,
       DonGia: data.DonGia,
@@ -144,11 +147,13 @@ async function addBook(data) {
       TacGia: data.TacGia,
       MoTaSach: data.MoTaSach,
       Image: data.Image,
+      Pdf: data.PdfFile, // ← Thêm PDF
       MaNXB: nxb._id,
       MaTheLoai: theLoai._id,
     });
 
-    return newBook;
+    const savedBook = await newBook.save();
+    return savedBook;
   } catch (err) {
     console.error("Lỗi khi thêm sách:", err);
     throw err;
@@ -194,6 +199,7 @@ async function updateBook(id, data) {
     if (data.TacGia) updateData.TacGia = data.TacGia;
     if (data.MoTaSach) updateData.MoTaSach = data.MoTaSach;
     if (data.Image) updateData.Image = data.Image;
+    if (data.PdfFile) updateData.Pdf = data.PdfFile;
 
     const updatedBook = await Sach.findByIdAndUpdate(id, updateData, {
       new: true,
@@ -546,33 +552,34 @@ async function confirmPaidCompensation(requestId) {
 async function confirmRepaired(requestId) {
   try {
     // Tìm bản ghi theo dõi mượn sách
-    const borrowRecord = await TheoDoiMuonSach.findById(requestId).populate('MaSach');
-    
+    const borrowRecord = await TheoDoiMuonSach.findById(requestId).populate(
+      "MaSach"
+    );
+
     if (!borrowRecord) {
       throw new Error("Không tìm thấy bản ghi mượn sách");
     }
 
     // Kiểm tra xem sách có phải là "Hư sách" không
-    if (borrowRecord.TinhTrangSach !== 'Hư sách') {
-      throw new Error("Chỉ có thể xác nhận sửa cho sách có tình trạng 'Hư sách'");
+    if (borrowRecord.TinhTrangSach !== "Hư sách") {
+      throw new Error(
+        "Chỉ có thể xác nhận sửa cho sách có tình trạng 'Hư sách'"
+      );
     }
 
     // Cập nhật trạng thái đã sửa
     const updated = await TheoDoiMuonSach.findByIdAndUpdate(
       requestId,
       {
-        DaSua: true
+        DaSua: true,
       },
       { new: true }
     );
 
     // Cộng thêm 1 vào số quyển sách (vì sách đã được sửa, có thể cho mượn lại)
-    await Sach.findByIdAndUpdate(
-      borrowRecord.MaSach._id,
-      {
-        $inc: { SoQuyen: 1 }
-      }
-    );
+    await Sach.findByIdAndUpdate(borrowRecord.MaSach._id, {
+      $inc: { SoQuyen: 1 },
+    });
 
     return updated;
   } catch (err) {
@@ -1784,5 +1791,5 @@ module.exports = {
   updateBookPenaltyRule,
   getBookBorrowRule,
   updateBookBorrowRule,
-  confirmRepaired
+  confirmRepaired,
 };

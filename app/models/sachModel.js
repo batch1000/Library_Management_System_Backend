@@ -36,6 +36,11 @@ const SachSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    Pdf: {
+        type: String,
+        required: false,
+        trim: true
+    },
     MoTaSach: {
         type: String,
         required: true,

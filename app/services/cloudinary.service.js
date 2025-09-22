@@ -8,17 +8,27 @@ cloudinary.config({
 
 async function uploadToCloudinary(buffer) {
     return new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-            { resource_type: 'image', folder: 'images' },
-            (error, result) => {
-                if (error) return reject(error);
-                resolve(result);
-            }
-        );
-
-        stream.end(buffer);
+      let options = { resource_type: "image", folder: "images" }; // mặc định ảnh
+  
+      // Kiểm tra PDF theo magic number (%PDF)
+      const header = buffer.toString("utf8", 0, 4);
+      if (header === "%PDF") {
+        options = {
+          resource_type: "raw",
+          folder: "pdfs",
+          format: "pdf",
+          access_mode: "public", 
+        };
+      }
+  
+      const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      });
+  
+      stream.end(buffer);
     });
-}
+  }
 
 async function deleteImageFromCloudinary(publicId) {
     return new Promise((resolve, reject) => {

@@ -116,12 +116,30 @@ async function getBookById(req, res) {
 async function addBook(req, res) {
   try {
     const body = req.body;
-    const file = req.file;
+    const files = req.files;
+    const imageFile = files && files.image ? files.image[0] : null;
+    const pdfFile = files && files.pdfFile ? files.pdfFile[0] : null;
 
-    const uploadResult = await uploadToCloudinary(file.buffer);
+    // Upload ảnh (bắt buộc)
+    if (!imageFile) {
+      return res.status(400).send("Vui lòng chọn ảnh sách");
+    }
+    
+    const uploadResult = await uploadToCloudinary(imageFile.buffer);
     if (!uploadResult) {
       console.log("Lỗi khi upload ảnh lên cloud");
-      return;
+      return res.status(500).send("Lỗi khi upload ảnh");
+    }
+
+    // Upload PDF (nếu có)
+    let pdfUrl = null;
+    if (pdfFile) {
+      const pdfUploadResult = await uploadToCloudinary(pdfFile.buffer);
+      if (!pdfUploadResult) {
+        console.log("Lỗi khi upload PDF lên cloud");
+        return res.status(500).send("Lỗi khi upload PDF");
+      }
+      pdfUrl = pdfUploadResult.secure_url;
     }
 
     const bookData = {
@@ -132,15 +150,17 @@ async function addBook(req, res) {
       TacGia: body.author,
       MoTaSach: body.description,
       Image: uploadResult.secure_url,
-      NhaXuatBan: body.publisher,
-      DiaChiNhaXuatBan: body.publisherAddress,
-      TheLoai: body.genre,
+      PdfFile: pdfUrl, // ← Thêm PDF
+      TenNXB: body.publisher, // ← Sửa tên field
+      DiaChiNXB: body.publisherAddress, // ← Sửa tên field
+      TenTheLoai: body.genre, // ← Sửa tên field
     };
 
     const result = await bookService.addBook(bookData);
     res.json(result);
     console.log("Thêm sách thành công: ", result._id);
   } catch (error) {
+    console.error("Lỗi khi thêm sách:", error);
     res.status(500).send("Thêm sách thất bại");
   }
 }
@@ -149,7 +169,9 @@ async function updateBook(req, res) {
   try {
     const bookId = req.params.id;
     const body = req.body;
-    const file = req.file;
+    const files = req.files;
+    const imageFile = files && files.image ? files.image[0] : null;
+    const pdfFile = files && files.pdfFile ? files.pdfFile[0] : null;
 
     const updateData = {};
 
@@ -166,7 +188,7 @@ async function updateBook(req, res) {
     let oldImageUrl = null;
 
     // Lấy ảnh cũ trước khi update (nếu có file mới)
-    if (file) {
+    if (imageFile) {
       try {
         const currentBook = await require("../../models/sachModel").findById(
           bookId
@@ -179,12 +201,22 @@ async function updateBook(req, res) {
       }
 
       // Upload ảnh mới
-      const uploadResult = await uploadToCloudinary(file.buffer);
+      const uploadResult = await uploadToCloudinary(imageFile.buffer);
       if (!uploadResult) {
         console.log("Lỗi khi upload ảnh lên cloud");
         return res.status(500).send("Lỗi khi upload ảnh mới");
       }
       updateData.Image = uploadResult.secure_url;
+    }
+
+    // Upload PDF nếu có
+    if (pdfFile) {
+      const pdfUploadResult = await uploadToCloudinary(pdfFile.buffer);
+      if (!pdfUploadResult) {
+        console.log("Lỗi khi upload PDF lên cloud");
+        return res.status(500).send("Lỗi khi upload PDF mới");
+      }
+      updateData.PdfFile = pdfUploadResult.secure_url;
     }
 
     // Update sách
@@ -195,7 +227,7 @@ async function updateBook(req, res) {
     console.log("Cập nhật sách thành công:", bookId);
 
     // Xóa ảnh cũ trong background (không block response)
-    if (file && oldImageUrl) {
+    if (imageFile && oldImageUrl) {
       setImmediate(async () => {
         try {
           const oldPublicId = extractPublicIdFromUrl(oldImageUrl);
@@ -803,7 +835,13 @@ async function getBookBorrowRule(req, res) {
 
 async function updateBookBorrowRule(req, res) {
   try {
-    const { maxBooks, maxBooksPerDay, borrowDuration, pickupDeadline, renewalDuration } = req.body;
+    const {
+      maxBooks,
+      maxBooksPerDay,
+      borrowDuration,
+      pickupDeadline,
+      renewalDuration,
+    } = req.body;
 
     // gọi service để update
     const updatedRule = await bookService.updateBookBorrowRule({
@@ -811,13 +849,15 @@ async function updateBookBorrowRule(req, res) {
       maxBooksPerDay,
       borrowDuration,
       pickupDeadline,
-      renewalDuration
+      renewalDuration,
     });
 
     res.status(200).json(updatedRule);
   } catch (error) {
     console.error("❌ Lỗi khi cập nhật quy định mượn sách:", error);
-    res.status(500).json({ message: "Lỗi server khi cập nhật quy định mượn sách" });
+    res
+      .status(500)
+      .json({ message: "Lỗi server khi cập nhật quy định mượn sách" });
   }
 }
 
@@ -864,5 +904,5 @@ module.exports = {
   updateBookPenaltyRule,
   getBookBorrowRule,
   updateBookBorrowRule,
-  confirmRepaired
+  confirmRepaired,
 };
