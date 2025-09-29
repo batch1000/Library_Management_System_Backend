@@ -124,7 +124,7 @@ async function addBook(req, res) {
     if (!imageFile) {
       return res.status(400).send("Vui lòng chọn ảnh sách");
     }
-    
+
     const uploadResult = await uploadToCloudinary(imageFile.buffer);
     if (!uploadResult) {
       console.log("Lỗi khi upload ảnh lên cloud");
@@ -861,6 +861,117 @@ async function updateBookBorrowRule(req, res) {
   }
 }
 
+async function addThesis(req, res) {
+  try {
+    const body = req.body;
+    const files = req.files;
+
+    const imageFile = files && files.image ? files.image[0] : null;
+    const pdfFile = files && files.pdfFile ? files.pdfFile[0] : null;
+
+    // Bắt buộc phải có PDF
+    if (!pdfFile) {
+      return res.status(400).send("Vui lòng chọn file PDF luận văn");
+    }
+
+    // Upload PDF
+    const pdfUploadResult = await uploadToCloudinary(pdfFile.buffer);
+    if (!pdfUploadResult) {
+      console.log("Lỗi khi upload PDF lên cloud");
+      return res.status(500).send("Lỗi khi upload PDF");
+    }
+    const pdfUrl = pdfUploadResult.secure_url;
+
+    // Upload ảnh (nếu có)
+    let imageUrl = null;
+    if (imageFile) {
+      const uploadResult = await uploadToCloudinary(imageFile.buffer);
+      if (!uploadResult) {
+        console.log("Lỗi khi upload ảnh lên cloud");
+        return res.status(500).send("Lỗi khi upload ảnh");
+      }
+      imageUrl = uploadResult.secure_url;
+    }
+
+    // Chuẩn bị dữ liệu để lưu
+    const thesisData = {
+      TieuDeTai: body.topicName,
+      MaSV: body.userId, // _id sinh viên gửi từ client
+      BacDaoTao: body.educationLevel,
+      NamBaoVe: Number(body.defenseYear),
+      GiaoVienHuongDan: body.supervisor,
+      Pdf: pdfUrl,
+      Image: imageUrl,
+    };
+
+    const result = await bookService.addThesis(thesisData);
+    res.json(result);
+    console.log("Nộp luận văn thành công:", result._id);
+  } catch (error) {
+    console.error("Lỗi khi nộp luận văn:", error);
+    res.status(500).send("Nộp luận văn thất bại");
+  }
+}
+
+async function getOneThesis(req, res) {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.json({ error: "Thiếu userId" });
+    }
+
+    const result = await bookService.getOneThesis(userId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy luận văn:", error);
+    res.json({ error: "Lỗi server khi lấy luận văn" });
+  }
+}
+
+async function getAllThesis(req, res) {
+  try {
+    const result = await bookService.getAllThesis();
+    // console.log(JSON.stringify(result, null, 2));
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy tất cả luận văn:", error);
+    res.json({ error: "Lỗi server khi lấy tất cả luận văn" });
+  }
+}
+
+async function approveThesis(req, res) {
+  try {
+    const { thesisId } = req.body;
+
+    if (!thesisId) {
+      return res.json({ error: "Thiếu thesisId" });
+    }
+
+    const result = await bookService.approveThesis(thesisId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi duyệt luận văn:", error);
+    res.json({ error: "Lỗi server khi duyệt luận văn" });
+  }
+}
+
+async function rejectThesis(req, res) {
+  try {
+    const { thesisId } = req.body;
+
+    if (!thesisId) {
+      return res.json({ error: "Thiếu thesisId" });
+    }
+
+    const result = await bookService.rejectThesis(thesisId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi từ chối luận văn:", error);
+    res.json({ error: "Lỗi server khi từ chối luận văn" });
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -905,4 +1016,9 @@ module.exports = {
   getBookBorrowRule,
   updateBookBorrowRule,
   confirmRepaired,
+  addThesis,
+  getOneThesis,
+  getAllThesis,
+  approveThesis,
+  rejectThesis
 };

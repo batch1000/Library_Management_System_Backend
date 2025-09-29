@@ -44,4 +44,11 @@ const DocGiaSchema = new mongoose.Schema({
   timestamps: true
 });
 
+DocGiaSchema.virtual("SinhVien", {
+  ref: "SinhVien",
+  localField: "_id",   // _id của DocGia
+  foreignField: "MaDocGia", // trỏ tới field MaDocGia trong SinhVien
+  justOne: true,       // vì 1 DocGia chỉ có 1 SinhVien
+});
+
 module.exports = mongoose.model('DocGia', DocGiaSchema);

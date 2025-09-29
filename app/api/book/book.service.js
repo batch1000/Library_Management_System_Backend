@@ -10,6 +10,8 @@ const TheoDoiXemSach = require("../../models/theodoixemsachModel");
 const QuyDinhPhatSach = require("../../models/quydinhphatsachModel");
 const QuyDinhMuonSach = require("../../models/quydinhmuonsachModel");
 const DocGia = require("../../models/docgiaModel");
+const LuanVan = require("../../models/luanvanModel");
+const SinhVien = require("../../models/sinhvienModel");
 
 const {
   deleteImageFromCloudinary,
@@ -1749,6 +1751,85 @@ async function updateBookBorrowRule(ruleUpdates) {
   }
 }
 
+async function addThesis(data) {
+  try {
+    const newThesis = new LuanVan({
+      TieuDeTai: data.TieuDeTai,
+      MaDocGia: data.MaSV,
+      BacDaoTao: data.BacDaoTao,
+      NamBaoVe: data.NamBaoVe,
+      GiaoVienHuongDan: data.GiaoVienHuongDan,
+      Pdf: data.Pdf,
+      Image: data.Image,
+    });
+
+    const savedThesis = await newThesis.save();
+    return savedThesis;
+  } catch (err) {
+    console.error("Lỗi khi thêm luận văn:", err);
+    throw err;
+  }
+}
+
+async function getOneThesis(userId) {
+  try {
+    return await LuanVan.findOne({ MaDocGia: userId })
+      .sort({ createdAt: -1 }) 
+      .lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function getAllThesis() {
+  try {
+    return await LuanVan.find()
+      .populate({
+        path: "MaDocGia",
+        select: "MaDocGia HoLot Ten",
+        populate: {
+          path: "SinhVien",
+          select: "MaSinhVien Avatar MaNganhHoc",
+          populate: {
+            path: "MaNganhHoc",
+            select: "TenNganh Khoa",
+            populate: {
+              path: "Khoa",
+              select: "TenKhoa",
+            },
+          },
+        },
+      })
+      .lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function approveThesis(thesisId) {
+  try {
+    return await LuanVan.findByIdAndUpdate(
+      thesisId,
+      { TrangThai: "Đã duyệt", NgayNop: new Date() },
+      { new: true }
+    ).lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function rejectThesis(thesisId) {
+  try {
+    return await LuanVan.findByIdAndUpdate(
+      thesisId,
+      { TrangThai: "Từ chối" },
+      { new: true }
+    ).lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -1792,4 +1873,9 @@ module.exports = {
   getBookBorrowRule,
   updateBookBorrowRule,
   confirmRepaired,
+  addThesis,
+  getOneThesis,
+  getAllThesis,
+  approveThesis,
+  rejectThesis
 };

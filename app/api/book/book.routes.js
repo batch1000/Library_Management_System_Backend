@@ -44,6 +44,11 @@ const {
   getBookBorrowRule,
   updateBookBorrowRule,
   confirmRepaired,
+  addThesis,
+  getOneThesis,
+  getAllThesis,
+  approveThesis,
+  rejectThesis
 } = require("./book.controller");
 
 const router = express.Router();
@@ -112,4 +117,18 @@ router.get("/getBookPenaltyRule", getBookPenaltyRule);
 router.post("/updateBookPenaltyRule", updateBookPenaltyRule);
 router.get("/getBookBorrowRule", getBookBorrowRule);
 router.post("/updateBookBorrowRule", updateBookBorrowRule);
+
+router.post(
+  "/addThesis",
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "pdfFile", maxCount: 1 },
+  ]),
+  addThesis
+);
+router.post("/getOneThesis", getOneThesis);
+router.get("/getAllThesis", getAllThesis);
+router.post("/approveThesis", approveThesis);
+router.post("/rejectThesis", rejectThesis);
+
 module.exports = router;
