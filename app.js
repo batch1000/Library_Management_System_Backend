@@ -9,6 +9,7 @@ app.use(express.json());
 app.use("/api/auth", require("./app/api/auth/auth.routes"));
 app.use("/api/book", require("./app/api/book/book.routes"));
 app.use("/api/library", require("./app/api/library/library.routes"));
+app.use("/api/room", require("./app/api/room/room.routes"));
 
 module.exports = app;
 

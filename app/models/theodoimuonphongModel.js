@@ -11,12 +11,17 @@ const TheoDoiDatPhongSchema = new mongoose.Schema({
     required: true
   },
 
-  KhungGioBatDau: {
+  NgayDuyet: {
+    type: Date,
+    default: null
+  },
+
+  GioBatDau: {
     type: String,
     required: true
   },
 
-  KhungGioKetThuc: {
+  GioKetThuc: {
     type: String,
     required: true
   },
@@ -42,12 +47,6 @@ const TheoDoiDatPhongSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'DocGia',
     required: true
-  },
-
-  NhanVien: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'NhanVien',
-    default: null
   }
 }, {
   timestamps: true

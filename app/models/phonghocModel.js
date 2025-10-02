@@ -22,9 +22,9 @@ const PhongHocSchema = new mongoose.Schema({
     required: true
   },
   ViTri: {
-    type: String,
-    required: false,
-    trim: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ViTriPhong',
+    required: false
   }
 }, {
   timestamps: true
