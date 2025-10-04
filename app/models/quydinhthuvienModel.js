@@ -17,6 +17,11 @@ const libraryRuleSchema = new mongoose.Schema(
       required: true,
       default: 3, // số ngày chờ in thẻ
     },
+    cardValidityDays: {
+      type: Number,
+      required: true,
+      default: 365, // số ngày thẻ có hiệu lực (mặc định 1 năm)
+    },
   },
   {
     timestamps: true,

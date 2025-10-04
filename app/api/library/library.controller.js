@@ -146,13 +146,14 @@ async function getCardRule(req, res) {
 
 async function updateCardRule(req, res) {
   try {
-    const { renewalFee, reissueFee, printWaitingDays } = req.body;
+    const { renewalFee, reissueFee, printWaitingDays, cardValidityDays } = req.body;
 
     // gọi service để update
     const updatedRule = await libraryService.updateCardRule({
       renewalFee,
       reissueFee,
-      printWaitingDays
+      printWaitingDays,
+      cardValidityDays
     });
 
     res.status(200).json(updatedRule);

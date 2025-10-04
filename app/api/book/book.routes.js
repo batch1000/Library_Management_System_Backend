@@ -52,7 +52,8 @@ const {
   addTextBook,
   updateTextBook,
   getOneTextBook,
-  getAllFaculty
+  getAllFaculty,
+  addFaculty
 } = require("./book.controller");
 
 const router = express.Router();
@@ -100,6 +101,7 @@ router.post("/getOneTextBook", getOneTextBook);
 router.post("/addGenre", addGenre);
 router.get("/getAllGenre", getAllGenre);
 router.get("/getAllFaculty", getAllFaculty);
+router.post("/addFaculty", addFaculty);
 router.post("/lendBook", lendBook);
 router.get("/getBorrowBookOfUser/:id", getBorrowBookOfUser);
 router.post("/getInfoLendBook", getInfoLendBook);

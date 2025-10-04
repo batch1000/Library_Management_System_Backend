@@ -86,6 +86,27 @@ async function getAllFaculty(req, res) {
   }
 }
 
+async function addFaculty(req, res) {
+  try {
+    const { Faculty } = req.body;
+    const facultyName = Faculty.trim();
+
+    const result = await bookService.addFaculty(facultyName);
+
+    if (!result) {
+      console.log("Thêm khoa thất bại (đã tồn tại):", facultyName);
+      return res.status(500).send("Thêm khoa thất bại");
+    }
+
+    res.json(result);
+    console.log("Thêm khoa thành công:", result._id);
+  } catch (error) {
+    console.error("Lỗi khi thêm khoa:", error);
+    res.status(500).send("Thêm khoa thất bại");
+  }
+}
+
+
 async function getAllBook(req, res) {
   try {
     const books = await bookService.getAllBook();
@@ -1170,5 +1191,6 @@ module.exports = {
   addTextBook,
   updateTextBook,
   getOneTextBook,
-  getAllFaculty
+  getAllFaculty,
+  addFaculty
 };

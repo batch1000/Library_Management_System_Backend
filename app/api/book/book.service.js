@@ -38,6 +38,18 @@ async function getAllFaculty() {
   return await Khoa.find().sort({ TenKhoa: 1 });
 }
 
+async function addFaculty(facultyName) {
+  const existing = await Khoa.findOne({ TenKhoa: facultyName });
+  if (existing) {
+    return null;
+  }
+
+  const newFaculty = new Khoa({ TenKhoa: facultyName });
+  const savedFaculty = await newFaculty.save();
+
+  return savedFaculty;
+}
+
 async function generateMaSach() {
   const latestBook = await Sach.findOne().sort({ createdAt: -1 }).exec();
   let nextNumber = 1;
@@ -110,7 +122,7 @@ async function getOneBook(keyword) {
 async function getOneTextBook(keyword) {
   try {
     let query = {
-      LoaiSach: "GiaoTrinh" // Chỉ lấy sách có LoaiSach là GiaoTrinh
+      LoaiSach: "GiaoTrinh", // Chỉ lấy sách có LoaiSach là GiaoTrinh
     };
 
     // Kiểm tra nếu keyword là mã sách (format: S + số)
@@ -123,7 +135,7 @@ async function getOneTextBook(keyword) {
 
     const textBook = await Sach.findOne(query)
       .populate("MaNXB", "TenNXB DiaChi")
-      .populate("Khoa", "TenKhoa")  // Populate Khoa thay vì MaTheLoai
+      .populate("Khoa", "TenKhoa") // Populate Khoa thay vì MaTheLoai
       .exec();
 
     return textBook;
@@ -282,7 +294,7 @@ async function addTextBook(data) {
       Pdf: data.PdfFile,
       MaNXB: nxb._id,
       LoaiSach: "GiaoTrinh",
-      Khoa: khoa._id
+      Khoa: khoa._id,
       // KHÔNG có MaTheLoai
     });
 
@@ -1906,7 +1918,7 @@ async function addThesis(data) {
 async function getOneThesis(userId) {
   try {
     return await LuanVan.findOne({ MaDocGia: userId })
-      .sort({ createdAt: -1 }) 
+      .sort({ createdAt: -1 })
       .lean();
   } catch (err) {
     throw err;
@@ -2013,5 +2025,6 @@ module.exports = {
   addTextBook,
   updateTextBook,
   getOneTextBook,
-  getAllFaculty
+  getAllFaculty,
+  addFaculty
 };
