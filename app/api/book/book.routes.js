@@ -48,7 +48,11 @@ const {
   getOneThesis,
   getAllThesis,
   approveThesis,
-  rejectThesis
+  rejectThesis,
+  addTextBook,
+  updateTextBook,
+  getOneTextBook,
+  getAllFaculty
 } = require("./book.controller");
 
 const router = express.Router();
@@ -74,9 +78,28 @@ router.post(
 );
 router.post("/deleteBook/:id", deleteBook);
 
+router.post(
+  "/addTextBook",
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "pdfFile", maxCount: 1 },
+  ]),
+  addTextBook
+);
+
+router.post(
+  "/updateTextBook/:id",
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "pdfFile", maxCount: 1 },
+  ]),
+  updateTextBook
+);
+router.post("/getOneTextBook", getOneTextBook);
+
 router.post("/addGenre", addGenre);
 router.get("/getAllGenre", getAllGenre);
-
+router.get("/getAllFaculty", getAllFaculty);
 router.post("/lendBook", lendBook);
 router.get("/getBorrowBookOfUser/:id", getBorrowBookOfUser);
 router.post("/getInfoLendBook", getInfoLendBook);

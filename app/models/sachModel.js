@@ -1,63 +1,79 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const SachSchema = new mongoose.Schema({
+const SachSchema = new mongoose.Schema(
+  {
     MaSach: {
-        type: String,
-        required: true,
-        unique: true,
-        trim: true
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
     },
     TenSach: {
-        type: String,
-        required: true,
-        trim: true
+      type: String,
+      required: true,
+      trim: true,
     },
     DonGia: {
-        type: Number,
-        required: true,
-        min: 0
+      type: Number,
+      required: true,
+      min: 0,
     },
     SoQuyen: {
-        type: Number,
-        required: true,
-        min: 0
+      type: Number,
+      required: true,
+      min: 0,
     },
     NamXuatBan: {
-        type: Number,
-        required: true
+      type: Number,
+      required: true,
     },
     TacGia: {
-        type: String,
-        required: true,
-        trim: true
+      type: String,
+      required: true,
+      trim: true,
     },
     Image: {
-        type: String,
-        required: true,
-        trim: true
+      type: String,
+      required: true,
+      trim: true,
     },
     Pdf: {
-        type: String,
-        required: false,
-        trim: true
+      type: String,
+      required: false,
+      trim: true,
     },
     MoTaSach: {
-        type: String,
-        required: true,
-        trim: true
+      type: String,
+      required: true,
+      trim: true,
     },
     MaNXB: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'NhaXuatBan',
-        required: true
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "NhaXuatBan",
+      required: true,
     },
     MaTheLoai: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'TheLoaiSach',
-        required: true
-    }
-}, {
-    timestamps: true
-});
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TheLoaiSach",
+      required: false,
+    },
+    LoaiSach: {
+      type: String,
+      enum: ["Sach", "GiaoTrinh"],
+      default: "Sach",
+      required: true,
+    },
+    Khoa: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Khoa",
+      required: function () {
+        return this.LoaiSach === "GiaoTrinh";
+      },
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-module.exports = mongoose.model('Sach', SachSchema);
+module.exports = mongoose.model("Sach", SachSchema);

@@ -331,6 +331,27 @@ function normalizeDate(date) {
 //     }
 // })();
 
+// const Sach = require('./app/models/sachModel');
+
+// (async () => {
+//   try {
+//     // Cập nhật toàn bộ sách thành LoaiSach = "Sach"
+//     const result = await Sach.updateMany({}, { $set: { LoaiSach: "Sach" } });
+
+//     console.log(`✅ Đã cập nhật ${result.modifiedCount} sách.`);
+
+//     // Kiểm tra lại
+//     const books = await Sach.find();
+//     console.log(`📌 Tổng số sách: ${books.length}`);
+//     books.forEach((book, i) => {
+//       console.log(`${i + 1}. _id: ${book._id} | Tên sách: ${book.TenSach} | LoaiSach: ${book.LoaiSach}`);
+//     });
+//   } catch (err) {
+//     console.error("❌ Lỗi:", err.message);
+//   }
+// })();
+
+
 //----------------------Rating Book 2 Weeks-------------------------
 // const DanhGiaSach = require('./app/models/danhgiasachModel');
 

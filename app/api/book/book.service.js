@@ -12,6 +12,7 @@ const QuyDinhMuonSach = require("../../models/quydinhmuonsachModel");
 const DocGia = require("../../models/docgiaModel");
 const LuanVan = require("../../models/luanvanModel");
 const SinhVien = require("../../models/sinhvienModel");
+const Khoa = require("../../models/khoaModel");
 
 const {
   deleteImageFromCloudinary,
@@ -31,6 +32,10 @@ async function addGenre(genreName) {
 
 async function getAllGenre() {
   return await TheLoaiSach.find().sort({ TenTheLoai: 1 });
+}
+
+async function getAllFaculty() {
+  return await Khoa.find().sort({ TenKhoa: 1 });
 }
 
 async function generateMaSach() {
@@ -70,6 +75,7 @@ async function getAllBook() {
     const books = await Sach.find()
       .populate("MaNXB", "TenNXB DiaChi")
       .populate("MaTheLoai", "TenTheLoai")
+      .populate("Khoa", "TenKhoa")
       .exec();
 
     return books;
@@ -101,11 +107,38 @@ async function getOneBook(keyword) {
   }
 }
 
+async function getOneTextBook(keyword) {
+  try {
+    let query = {
+      LoaiSach: "GiaoTrinh" // Chỉ lấy sách có LoaiSach là GiaoTrinh
+    };
+
+    // Kiểm tra nếu keyword là mã sách (format: S + số)
+    if (/^S\d+$/i.test(keyword)) {
+      query.MaSach = keyword.toUpperCase();
+    } else {
+      // Nếu không phải mã sách thì tìm theo tên
+      query.TenSach = { $regex: `^${keyword}$`, $options: "i" };
+    }
+
+    const textBook = await Sach.findOne(query)
+      .populate("MaNXB", "TenNXB DiaChi")
+      .populate("Khoa", "TenKhoa")  // Populate Khoa thay vì MaTheLoai
+      .exec();
+
+    return textBook;
+  } catch (err) {
+    console.error("Lỗi khi truy vấn một giáo trình:", err);
+    throw err;
+  }
+}
+
 async function getBookById(id) {
   try {
     const book = await Sach.findById(id)
       .populate("MaNXB", "TenNXB DiaChi")
       .populate("MaTheLoai", "TenTheLoai")
+      .populate("Khoa", "TenKhoa")
       .exec();
 
     return book;
@@ -210,6 +243,105 @@ async function updateBook(id, data) {
     return updatedBook;
   } catch (err) {
     console.error("Lỗi khi cập nhật sách:", err);
+    throw err;
+  }
+}
+
+async function addTextBook(data) {
+  try {
+    // Xử lý nhà xuất bản
+    let nxb = await NhaXuatBan.findOne({ TenNXB: data.TenNXB }).exec();
+    if (!nxb) {
+      const maNXB = await generateMaNXB();
+      nxb = await NhaXuatBan.create({
+        MaNXB: maNXB,
+        TenNXB: data.TenNXB,
+        DiaChi: data.DiaChiNXB || "",
+      });
+    }
+
+    // Xử lý khoa
+    let khoa = await Khoa.findOne({ TenKhoa: data.TenKhoa }).exec();
+    if (!khoa) {
+      khoa = await Khoa.create({ TenKhoa: data.TenKhoa });
+    }
+
+    // Generate mã sách
+    const maSach = await generateMaSach();
+
+    // Tạo sách giáo trình mới
+    const newTextBook = new Sach({
+      MaSach: maSach,
+      TenSach: data.TenSach,
+      DonGia: data.DonGia,
+      SoQuyen: data.SoQuyen,
+      NamXuatBan: data.NamXuatBan,
+      TacGia: data.TacGia,
+      MoTaSach: data.MoTaSach,
+      Image: data.Image,
+      Pdf: data.PdfFile,
+      MaNXB: nxb._id,
+      LoaiSach: "GiaoTrinh",
+      Khoa: khoa._id
+      // KHÔNG có MaTheLoai
+    });
+
+    return await newTextBook.save();
+  } catch (err) {
+    console.error("Lỗi khi thêm giáo trình:", err);
+    throw err;
+  }
+}
+
+async function updateTextBook(id, data) {
+  try {
+    const updateData = {};
+
+    // Xử lý nhà xuất bản
+    if (data.TenNXB) {
+      let nxb = await NhaXuatBan.findOne({ TenNXB: data.TenNXB }).exec();
+
+      if (!nxb) {
+        const maNXB = await generateMaNXB();
+        nxb = await NhaXuatBan.create({
+          MaNXB: maNXB,
+          TenNXB: data.TenNXB,
+          DiaChi: data.DiaChiNXB || "",
+        });
+      } else if (data.DiaChiNXB) {
+        nxb.DiaChi = data.DiaChiNXB;
+        await nxb.save();
+      }
+
+      updateData.MaNXB = nxb._id;
+    }
+
+    // Xử lý khoa
+    if (data.TenKhoa) {
+      let khoa = await Khoa.findOne({ TenKhoa: data.TenKhoa }).exec();
+      if (!khoa) {
+        khoa = await Khoa.create({ TenKhoa: data.TenKhoa });
+      }
+      updateData.Khoa = khoa._id;
+    }
+
+    // Các trường khác
+    if (data.TenSach) updateData.TenSach = data.TenSach;
+    if (data.DonGia) updateData.DonGia = Number(data.DonGia);
+    if (data.SoQuyen) updateData.SoQuyen = Number(data.SoQuyen);
+    if (data.NamXuatBan) updateData.NamXuatBan = Number(data.NamXuatBan);
+    if (data.TacGia) updateData.TacGia = data.TacGia;
+    if (data.MoTaSach) updateData.MoTaSach = data.MoTaSach;
+    if (data.Image) updateData.Image = data.Image;
+    if (data.PdfFile) updateData.Pdf = data.PdfFile;
+
+    const updatedTextBook = await Sach.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
+
+    return updatedTextBook;
+  } catch (err) {
+    console.error("Lỗi khi cập nhật giáo trình:", err);
     throw err;
   }
 }
@@ -1877,5 +2009,9 @@ module.exports = {
   getOneThesis,
   getAllThesis,
   approveThesis,
-  rejectThesis
+  rejectThesis,
+  addTextBook,
+  updateTextBook,
+  getOneTextBook,
+  getAllFaculty
 };

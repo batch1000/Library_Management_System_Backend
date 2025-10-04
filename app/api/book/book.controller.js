@@ -77,6 +77,15 @@ async function getAllGenre(req, res) {
   }
 }
 
+async function getAllFaculty(req, res) {
+  try {
+    const result = await bookService.getAllFaculty();
+    res.json(result);
+  } catch (error) {
+    res.status(500).send("Lấy khoa thất bại");
+  }
+}
+
 async function getAllBook(req, res) {
   try {
     const books = await bookService.getAllBook();
@@ -96,6 +105,18 @@ async function getOneBook(req, res) {
   } catch (error) {
     console.error("Lỗi khi lấy sách:", error);
     res.status(500).send("Lấy sách thất bại");
+  }
+}
+
+async function getOneTextBook(req, res) {
+  try {
+    const { keyword } = req.body;
+    const textBook = await bookService.getOneTextBook(keyword);
+    res.json(textBook);
+    console.log("Lấy giáo trình thành công");
+  } catch (error) {
+    console.error("Lỗi khi lấy giáo trình:", error);
+    res.status(500).send("Lấy giáo trình thất bại");
   }
 }
 
@@ -255,6 +276,131 @@ async function deleteBook(req, res) {
   } catch (error) {
     console.error("Lỗi khi xóa sách:", error);
     res.status(500).send("Xóa sách thất bại");
+  }
+}
+
+async function addTextBook(req, res) {
+  try {
+    const body = req.body;
+    const files = req.files;
+    const imageFile = files && files.image ? files.image[0] : null;
+    const pdfFile = files && files.pdfFile ? files.pdfFile[0] : null;
+
+    if (!imageFile) {
+      return res.status(400).send("Vui lòng chọn ảnh giáo trình");
+    }
+
+    const uploadResult = await uploadToCloudinary(imageFile.buffer);
+    if (!uploadResult) return res.status(500).send("Lỗi upload ảnh");
+
+    let pdfUrl = null;
+    if (pdfFile) {
+      const pdfUploadResult = await uploadToCloudinary(pdfFile.buffer);
+      if (!pdfUploadResult) return res.status(500).send("Lỗi upload PDF");
+      pdfUrl = pdfUploadResult.secure_url;
+    }
+
+    const textBookData = {
+      TenSach: body.title,
+      DonGia: Number(body.price),
+      SoQuyen: Number(body.quantity),
+      NamXuatBan: Number(body.publicationYear),
+      TacGia: body.author,
+      MoTaSach: body.description,
+      Image: uploadResult.secure_url,
+      PdfFile: pdfUrl,
+      TenNXB: body.publisher,
+      DiaChiNXB: body.publisherAddress,
+      LoaiSach: "GiaoTrinh",      
+      TenKhoa: body.faculty          
+    };
+
+    const result = await bookService.addTextBook(textBookData);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi thêm giáo trình:", error);
+    res.status(500).send("Thêm giáo trình thất bại");
+  }
+}
+
+async function updateTextBook(req, res) {
+  try {
+    const bookId = req.params.id;
+    const body = req.body;
+    const files = req.files;
+    const imageFile = files && files.image ? files.image[0] : null;
+    const pdfFile = files && files.pdfFile ? files.pdfFile[0] : null;
+
+    const updateData = {};
+
+    if (body.TenSach) updateData.TenSach = body.TenSach;
+    if (body.DonGia) updateData.DonGia = Number(body.DonGia);
+    if (body.SoQuyen) updateData.SoQuyen = Number(body.SoQuyen);
+    if (body.NamXuatBan) updateData.NamXuatBan = Number(body.NamXuatBan);
+    if (body.TacGia) updateData.TacGia = body.TacGia;
+    if (body.MoTaSach) updateData.MoTaSach = body.MoTaSach;
+    if (body.TenNXB) updateData.TenNXB = body.TenNXB;
+    if (body.DiaChiNXB) updateData.DiaChiNXB = body.DiaChiNXB;
+    if (body.TenKhoa) updateData.TenKhoa = body.TenKhoa;
+
+    let oldImageUrl = null;
+
+    // Lấy ảnh cũ trước khi update (nếu có file mới)
+    if (imageFile) {
+      try {
+        const currentBook = await require("../../models/sachModel").findById(
+          bookId
+        );
+        if (currentBook && currentBook.Image) {
+          oldImageUrl = currentBook.Image;
+        }
+      } catch (error) {
+        console.warn("Không thể lấy thông tin giáo trình cũ:", error.message);
+      }
+
+      // Upload ảnh mới
+      const uploadResult = await uploadToCloudinary(imageFile.buffer);
+      if (!uploadResult) {
+        console.log("Lỗi khi upload ảnh lên cloud");
+        return res.status(500).send("Lỗi khi upload ảnh mới");
+      }
+      updateData.Image = uploadResult.secure_url;
+    }
+
+    // Upload PDF nếu có
+    if (pdfFile) {
+      const pdfUploadResult = await uploadToCloudinary(pdfFile.buffer);
+      if (!pdfUploadResult) {
+        console.log("Lỗi khi upload PDF lên cloud");
+        return res.status(500).send("Lỗi khi upload PDF mới");
+      }
+      updateData.PdfFile = pdfUploadResult.secure_url;
+    }
+
+    // Update giáo trình
+    const result = await bookService.updateTextBook(bookId, updateData);
+
+    // Response trước, xóa ảnh cũ sau (background)
+    res.json(result);
+    console.log("Cập nhật giáo trình thành công:", bookId);
+
+    // Xóa ảnh cũ trong background (không block response)
+    if (imageFile && oldImageUrl) {
+      setImmediate(async () => {
+        try {
+          const oldPublicId = extractPublicIdFromUrl(oldImageUrl);
+          if (oldPublicId) {
+            await deleteImageFromCloudinary(oldPublicId);
+            console.log("Đã xóa ảnh cũ từ Cloudinary:", oldPublicId);
+          }
+        } catch (deleteError) {
+          console.warn("Không thể xóa ảnh cũ:", deleteError.message);
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Lỗi khi cập nhật giáo trình:", error);
+    res.status(500).send("Cập nhật giáo trình thất bại");
   }
 }
 
@@ -1020,5 +1166,9 @@ module.exports = {
   getOneThesis,
   getAllThesis,
   approveThesis,
-  rejectThesis
+  rejectThesis,
+  addTextBook,
+  updateTextBook,
+  getOneTextBook,
+  getAllFaculty
 };
