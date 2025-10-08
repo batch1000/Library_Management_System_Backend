@@ -180,7 +180,7 @@ async function getAllBookRoomByUserId(req, res) {
     if (!result || result.length === 0) {
       return res.status(404).send("Không tìm thấy lịch đặt phòng nào");
     }
-    // console.log(result);
+    // console.log(JSON.stringify(result, null, 2));
     res.json(result);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách đặt phòng theo userId:", error);
@@ -190,44 +190,18 @@ async function getAllBookRoomByUserId(req, res) {
 
 async function createBooking(req, res) {
   try {
-    const { _idDocGia, PhongHoc, NgaySuDung, GioBatDau, GioKetThuc } = req.body;
+    const { _idDocGia, PhongHoc, NgaySuDung, GioBatDau, GioKetThuc, ThanhVien } = req.body;
 
-    // Trim dữ liệu chuỗi
     const bookingData = {
       DocGia: _idDocGia,
       PhongHoc: PhongHoc,
-      NgaySuDung: NgaySuDung ? new Date(NgaySuDung) : null,
-      GioBatDau: GioBatDau ? GioBatDau.trim() : null,
-      GioKetThuc: GioKetThuc ? GioKetThuc.trim() : null,
+      NgaySuDung: new Date(NgaySuDung),
+      GioBatDau: GioBatDau.trim(),
+      GioKetThuc: GioKetThuc.trim(),
+      ThanhVien: ThanhVien || []
     };
 
-    // Kiểm tra dữ liệu bắt buộc
-    if (
-      !bookingData.DocGia ||
-      !bookingData.PhongHoc ||
-      !bookingData.NgaySuDung ||
-      !bookingData.GioBatDau ||
-      !bookingData.GioKetThuc
-    ) {
-      return res
-        .status(400)
-        .send(
-          "Thiếu dữ liệu: DocGia, PhongHoc, NgaySuDung, GioBatDau hoặc GioKetThuc"
-        );
-    }
-
-    // Validate logic thời gian
-    if (bookingData.GioBatDau >= bookingData.GioKetThuc) {
-      return res.status(400).send("GioBatDau phải nhỏ hơn GioKetThuc");
-    }
-
-    // Gọi service để tạo booking
     const result = await roomService.createBooking(bookingData);
-
-    if (!result) {
-      console.log("Tạo booking thất bại:", bookingData);
-      return res.status(500).send("Tạo booking thất bại");
-    }
 
     res.json(result);
   } catch (error) {
@@ -243,7 +217,7 @@ async function getAllBookRoomAdmin(req, res) {
     if (!result || result.length === 0) {
       return res.status(404).send("Không tìm thấy lịch đặt phòng nào");
     }
-    // console.log(result);
+    // console.log(JSON.stringify(result, null, 2));
     res.json(result);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách đặt phòng (Admin):", error);
@@ -319,6 +293,28 @@ async function cancelBooking(req, res) {
   }
 }
 
+async function checkInRoom(req, res) {
+  try {
+    const { bookingId } = req.body;
+
+    if (!bookingId) {
+      return res.status(400).send("Thiếu bookingId để check-in");
+    }
+    
+    const result = await roomService.checkInRoom(bookingId);
+
+    if (!result) {
+      console.log("Check-in thất bại:", bookingId);
+      return res.status(500).send("Check-in thất bại");
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi check-in:", error);
+    res.status(500).send("Lỗi khi check-in: " + error.message);
+  }
+}
+
 async function getBookedTimeSlotForRoom(req, res) {
   try {
     const { roomId } = req.body;
@@ -342,6 +338,143 @@ async function getBookedTimeSlotForRoom(req, res) {
   }
 }
 
+async function getRoomRule(req, res) {
+  try {
+    const rule = await roomService.getRoomRule();
+    return res.status(200).json(rule);
+  } catch (error) {
+    console.error("Lỗi khi lấy quy định phòng học:", error);
+    throw error;
+  }
+}
+
+async function updateRoomRule(req, res) {
+  try {
+    const { preOrderLimitDays } = req.body;
+
+    // Gọi service để cập nhật quy định phòng học
+    const updatedRule = await roomService.updateRoomRule({
+      preOrderLimitDays,
+    });
+
+    res.status(200).json(updatedRule);
+  } catch (error) {
+    console.error("❌ Lỗi khi cập nhật quy định phòng học:", error);
+    res.status(500).json({ message: "Lỗi server khi cập nhật quy định phòng học" });
+  }
+}
+
+async function searchMemberByCode(req, res) {
+  try {
+    const { MaDocGia } = req.body;
+
+    // Kiểm tra dữ liệu bắt buộc
+    if (!MaDocGia) {
+      return res.status(400).send("Thiếu dữ liệu: MaDocGia");
+    }
+
+    // Gọi service để tìm độc giả theo mã
+    const result = await roomService.searchMemberByCode(MaDocGia);
+
+    // Nếu không tìm thấy
+    if (!result) {
+      return res.status(404).json({ message: "Không tìm thấy độc giả" });
+    }
+
+    // Nếu tìm thấy thì trả về
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi tìm độc giả theo mã:", error);
+    res.status(500).send("Lỗi khi tìm độc giả: " + error.message);
+  }
+}
+
+async function getMyInvitations(req, res) {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).send("Thiếu userId");
+    }
+    
+    const result = await roomService.getMyInvitations(userId);
+
+    if (!result || result.length === 0) {
+      return res.status(404).send("Không tìm thấy lời mời nào");
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách lời mời:", error);
+    res.status(500).send("Lỗi khi lấy danh sách lời mời");
+  }
+}
+
+async function respondToInvitation(req, res) {
+  try {
+    const { bookingId, memberId, status } = req.body;
+
+    if (!bookingId || !memberId || !status) {
+      return res.status(400).send("Thiếu dữ liệu: bookingId, memberId hoặc status");
+    }
+
+    const result = await roomService.respondToInvitation(bookingId, memberId, status);
+
+    if (!result) {
+      return res.status(404).send("Không tìm thấy lời mời phù hợp");
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi cập nhật lời mời:", error);
+    res.status(500).send("Lỗi khi cập nhật lời mời");
+  }
+}
+
+async function checkMemberConflict(req, res) {
+  try {
+    const { memberId, ngaySuDung, gioBatDau, gioKetThuc } = req.body;
+
+    // Validate input
+    if (!memberId || !ngaySuDung || !gioBatDau || !gioKetThuc) {
+      return res.status(400).send("Thiếu thông tin kiểm tra (memberId, ngaySuDung, gioBatDau, gioKetThuc)");
+    }
+
+    const result = await roomService.checkMemberConflict(
+      memberId,
+      ngaySuDung,
+      gioBatDau,
+      gioKetThuc
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi kiểm tra đụng độ lịch thành viên:", error);
+    res.status(500).send("Lỗi khi kiểm tra đụng độ lịch");
+  }
+}
+
+async function getBookingsAsMember(req, res) {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).send("Thiếu userId");
+    }
+
+    const result = await roomService.getBookingsAsMember(userId);
+
+    if (!result || result.length === 0) {
+      return res.status(404).send("Không tìm thấy lịch đặt phòng nào");
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách đặt phòng với tư cách thành viên:", error);
+    res.status(500).send("Lỗi khi lấy danh sách đặt phòng");
+  }
+}
+
 module.exports = {
   addRoom,
   getAllRoom,
@@ -354,4 +487,12 @@ module.exports = {
   denyBooking,
   cancelBooking,
   getBookedTimeSlotForRoom,
+  getRoomRule,
+  updateRoomRule,
+  checkInRoom,
+  searchMemberByCode,
+  getMyInvitations,
+  respondToInvitation,
+  checkMemberConflict,
+  getBookingsAsMember
 };

@@ -12,7 +12,15 @@ const
         approveBooking,
         denyBooking,
         getBookedTimeSlotForRoom,
-        cancelBooking
+        cancelBooking,
+        getRoomRule,
+        updateRoomRule,
+        checkInRoom,
+        searchMemberByCode,
+        getMyInvitations,
+        respondToInvitation,
+        checkMemberConflict,
+        getBookingsAsMember
     } = require('./room.controller')
 
 const router = express.Router();
@@ -28,6 +36,18 @@ router.post('/createBooking', createBooking);
 router.post('/approveBooking', approveBooking);
 router.post('/denyBooking', denyBooking);
 router.post('/cancelBooking', cancelBooking);
+router.post('/checkInRoom', checkInRoom);
 router.post('/getBookedTimeSlotForRoom', getBookedTimeSlotForRoom);
+
+router.get("/getRoomRule", getRoomRule)
+router.post("/updateRoomRule", updateRoomRule)
+
+router.post("/searchMemberByCode", searchMemberByCode)
+router.post("/getMyInvitations", getMyInvitations)
+router.post("/respondToInvitation", respondToInvitation)
+
+router.post("/checkMemberConflict", checkMemberConflict)
+router.post("/getBookingsAsMember", getBookingsAsMember)
+
 
 module.exports = router;

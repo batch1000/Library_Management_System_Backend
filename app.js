@@ -10,6 +10,7 @@ app.use("/api/auth", require("./app/api/auth/auth.routes"));
 app.use("/api/book", require("./app/api/book/book.routes"));
 app.use("/api/library", require("./app/api/library/library.routes"));
 app.use("/api/room", require("./app/api/room/room.routes"));
+app.use("/api/notification", require("./app/api/notification/notification.routes"));
 
 module.exports = app;
 
@@ -200,26 +201,78 @@ function normalizeDate(date) {
   }
 })();
 
-// const QuyDinhMuonSach = require('./app/models/quydinhmuonsachModel');
+// Auto check phòng "no_show"
+const TheoDoiDatPhong = require("./app/models/theodoimuonphongModel");
+
+function normalizeDate(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+(async () => {
+  try {
+    const now = new Date();
+    const today = normalizeDate(now);
+
+    // Lấy danh sách đặt phòng đã duyệt (approved)
+    const approvedBookings = await TheoDoiDatPhong.find({
+      TrangThai: "approved",
+    });
+
+    let countNoShow = 0;
+
+    for (const booking of approvedBookings) {
+      const ngaySuDung = normalizeDate(new Date(booking.NgaySuDung));
+
+      // Nếu ngày sử dụng < hôm nay → no_show
+      if (ngaySuDung < today) {
+        booking.TrangThai = "no_show";
+        await booking.save();
+        console.log(`📅 Đặt phòng ${booking._id} đã quá ngày sử dụng, chuyển sang no_show`);
+        countNoShow++;
+        continue;
+      }
+
+      // Nếu ngày sử dụng là hôm nay → kiểm tra giờ kết thúc
+      if (ngaySuDung.getTime() === today.getTime()) {
+        // Tạo Date object với giờ kết thúc của đặt phòng
+        const [endHour, endMinute] = booking.GioKetThuc.split(":").map(Number);
+        const endTime = new Date(ngaySuDung);
+        endTime.setHours(endHour, endMinute, 0, 0);
+
+        if (now > endTime) {
+          booking.TrangThai = "no_show";
+          await booking.save();
+          console.log(`⏰ Đặt phòng ${booking._id} đã qua giờ kết thúc, chuyển sang no_show`);
+          countNoShow++;
+        }
+      }
+    }
+
+    if (countNoShow > 0) {
+      console.log(`✅ Đã cập nhật ${countNoShow} lượt đặt phòng sang trạng thái "no_show"`);
+    } else {
+      console.log("✅ Không có phòng nào cần chuyển sang no_show hôm nay.");
+    }
+  } catch (err) {
+    console.error("❌ Lỗi khi auto check no_show:", err.message);
+  }
+})();
+
+// const QuyDinhPhongHoc = require('./app/models/quydinhphonghocModel');
 
 // (async () => {
 //   try {
-//     // tạo dữ liệu mẫu (giống default trong schema)
-//     const rule = await QuyDinhMuonSach.create({
-//       maxBooks: 6,          // Số sách được mượn tối đa
-//       maxBooksPerDay: 3,    // Số sách được mượn tối đa trong ngày
-//       borrowDuration: 7,    // Số ngày mượn tối đa
+//     // Tạo dữ liệu mẫu (giống default trong schema)
+//     const rule = await QuyDinhPhongHoc.create({
+//       bookingLeadTime: 2, // Thời hạn đặt trước (số ngày)
 //     });
 
-//     console.log("✅ Đã tạo quy định mượn sách:");
-//     console.log(
-//       `maxBooks: ${rule.maxBooks} | maxBooksPerDay: ${rule.maxBooksPerDay} | borrowDuration: ${rule.borrowDuration} ngày`
-//     );
+//     console.log("✅ Đã tạo quy định phòng học:");
+//     console.log(`bookingLeadTime: ${rule.bookingLeadTime} ngày`);
 //   } catch (err) {
 //     console.error("❌ Lỗi:", err.message);
 //   }
 // })();
-
 // const DocGia = require('./app/models/docgiaModel'); // chỉnh lại đường dẫn nếu khác
 // (async () => {
 //     try {

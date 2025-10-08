@@ -29,10 +29,13 @@ const TheoDoiDatPhongSchema = new mongoose.Schema({
   TrangThai: {
     type: String,
     enum: [
+      'waiting_members',
       'pending',    // Chờ duyệt
       'approved',   // Đã duyệt
       'denied',     // Bị từ chối
-      'canceled'    // Người dùng hủy
+      'canceled',    // Người dùng hủy
+      'checked_in',  // Đã nhận phòng
+      'no_show'      // Không nhận phòng
     ],
     default: 'pending'
   },
@@ -47,7 +50,21 @@ const TheoDoiDatPhongSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'DocGia',
     required: true
-  }
+  },
+  //Phòng nhóm
+  ThanhVien: [
+    {
+      DocGia: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DocGia'
+      },
+      TrangThai: {
+        type: String,
+        enum: ['invited', 'accepted', 'declined'],
+        default: 'invited'
+      }
+    }
+  ]
 }, {
   timestamps: true
 });
