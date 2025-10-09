@@ -538,16 +538,29 @@ async function respondToInvitation(bookingId, memberId, status) {
     const booking = await TheoDoiDatPhong.findById(bookingId);
     if (!booking) return null;
 
-    // Tìm thành viên trong danh sách ThanhVien
     const member = booking.ThanhVien.find(
       (tv) => tv.DocGia && tv.DocGia.toString() === memberId
     );
     if (!member) return null;
 
-    // Cập nhật trạng thái của thành viên đó
+    // ⭐ THÊM: Kiểm tra đụng độ khi status là 'accepted'
+    if (status === "accepted") {
+      const conflictCheck = await checkMemberConflict(
+        memberId,
+        booking.NgaySuDung,
+        booking.GioBatDau,
+        booking.GioKetThuc
+      );
+
+      if (conflictCheck.hasConflict) {
+        const error = new Error("CONFLICT");
+        error.status = 409;
+        throw error;
+      }
+    }
+
     member.TrangThai = status;
 
-    // Kiểm tra tổng thể các thành viên
     const allAccepted = booking.ThanhVien.every(
       (tv) => tv.TrangThai === "accepted"
     );
@@ -555,16 +568,13 @@ async function respondToInvitation(bookingId, memberId, status) {
       (tv) => tv.TrangThai === "declined"
     );
 
-    // Cập nhật trạng thái tổng thể của booking
     if (anyDeclined) {
       booking.TrangThai = "canceled";
     } else if (allAccepted) {
       booking.TrangThai = "pending";
     }
 
-    // Lưu thay đổi
     await booking.save();
-
     return booking;
   } catch (err) {
     console.error("Lỗi khi cập nhật lời mời:", err);
@@ -577,7 +587,12 @@ function checkTimeOverlap(start1, end1, start2, end2) {
   return start1 < end2 && start2 < end1;
 }
 
-async function checkMemberConflict(memberId, ngaySuDung, gioBatDau, gioKetThuc) {
+async function checkMemberConflict(
+  memberId,
+  ngaySuDung,
+  gioBatDau,
+  gioKetThuc
+) {
   try {
     // Chuyển ngaySuDung thành Date object để so sánh
     const checkDate = new Date(ngaySuDung);
@@ -589,9 +604,9 @@ async function checkMemberConflict(memberId, ngaySuDung, gioBatDau, gioKetThuc) 
       DocGia: memberId,
       NgaySuDung: {
         $gte: startOfDay,
-        $lte: endOfDay
+        $lte: endOfDay,
       },
-      TrangThai: { $in: ['pending', 'approved'] }
+      TrangThai: { $in: ["pending", "approved"] },
     }).lean();
 
     // Kiểm tra xem có đụng độ giờ không
@@ -600,14 +615,21 @@ async function checkMemberConflict(memberId, ngaySuDung, gioBatDau, gioKetThuc) 
 
     for (let i = 0; i < bookings.length; i++) {
       const booking = bookings[i];
-      
+
       // Kiểm tra trùng giờ
-      if (checkTimeOverlap(gioBatDau, gioKetThuc, booking.GioBatDau, booking.GioKetThuc)) {
+      if (
+        checkTimeOverlap(
+          gioBatDau,
+          gioKetThuc,
+          booking.GioBatDau,
+          booking.GioKetThuc
+        )
+      ) {
         hasConflict = true;
         conflictDetails = {
           bookingId: booking._id,
           gioBatDau: booking.GioBatDau,
-          gioKetThuc: booking.GioKetThuc
+          gioKetThuc: booking.GioKetThuc,
         };
         break;
       }
@@ -615,26 +637,33 @@ async function checkMemberConflict(memberId, ngaySuDung, gioBatDau, gioKetThuc) 
 
     // Kiểm tra thêm: memberId có là thành viên của booking nào khác không
     const memberBookings = await TheoDoiDatPhong.find({
-      'ThanhVien.DocGia': memberId,
-      'ThanhVien.TrangThai': { $in: ['invited', 'accepted'] },
+      "ThanhVien.DocGia": memberId,
+      "ThanhVien.TrangThai": { $in: ["invited", "accepted"] },
       NgaySuDung: {
         $gte: startOfDay,
-        $lte: endOfDay
+        $lte: endOfDay,
       },
-      TrangThai: { $in: ['pending', 'approved'] }
+      TrangThai: { $in: ["pending", "approved"] },
     }).lean();
 
     if (!hasConflict && memberBookings.length > 0) {
       for (let i = 0; i < memberBookings.length; i++) {
         const booking = memberBookings[i];
-        
-        if (checkTimeOverlap(gioBatDau, gioKetThuc, booking.GioBatDau, booking.GioKetThuc)) {
+
+        if (
+          checkTimeOverlap(
+            gioBatDau,
+            gioKetThuc,
+            booking.GioBatDau,
+            booking.GioKetThuc
+          )
+        ) {
           hasConflict = true;
           conflictDetails = {
             bookingId: booking._id,
             gioBatDau: booking.GioBatDau,
             gioKetThuc: booking.GioKetThuc,
-            isMember: true
+            isMember: true,
           };
           break;
         }
@@ -643,9 +672,8 @@ async function checkMemberConflict(memberId, ngaySuDung, gioBatDau, gioKetThuc) 
 
     return {
       hasConflict: hasConflict,
-      conflictDetails: conflictDetails
+      conflictDetails: conflictDetails,
     };
-
   } catch (err) {
     console.error("Lỗi khi kiểm tra đụng độ lịch thành viên:", err);
     throw err;
@@ -656,8 +684,8 @@ async function getBookingsAsMember(userId) {
   try {
     // Tìm các booking mà userId là thành viên
     const bookings = await TheoDoiDatPhong.find({
-      'ThanhVien.DocGia': userId,
-      'ThanhVien.TrangThai': 'accepted' // Chỉ lấy booking đã chấp nhận
+      "ThanhVien.DocGia": userId,
+      "ThanhVien.TrangThai": "accepted", // Chỉ lấy booking đã chấp nhận
     })
       .populate({
         path: "PhongHoc",
@@ -666,7 +694,7 @@ async function getBookingsAsMember(userId) {
       .populate({
         path: "DocGia", // Người đặt phòng
         model: "DocGia",
-        select: "_id MaDocGia HoLot Ten"
+        select: "_id MaDocGia HoLot Ten",
       })
       .populate({
         path: "ThanhVien.DocGia",
@@ -708,7 +736,7 @@ async function getBookingsAsMember(userId) {
           MaDocGia: b.DocGia.MaDocGia,
           HoLot: b.DocGia.HoLot,
           Ten: b.DocGia.Ten,
-          HoTen: (hoLot + " " + ten).trim()
+          HoTen: (hoLot + " " + ten).trim(),
         };
       }
 
@@ -734,7 +762,10 @@ async function getBookingsAsMember(userId) {
       };
     });
   } catch (err) {
-    console.error("Lỗi khi lấy danh sách đặt phòng với tư cách thành viên:", err);
+    console.error(
+      "Lỗi khi lấy danh sách đặt phòng với tư cách thành viên:",
+      err
+    );
     throw err;
   }
 }
@@ -758,5 +789,5 @@ module.exports = {
   getMyInvitations,
   respondToInvitation,
   checkMemberConflict,
-  getBookingsAsMember
+  getBookingsAsMember,
 };

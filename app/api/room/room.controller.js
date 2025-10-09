@@ -427,6 +427,11 @@ async function respondToInvitation(req, res) {
     res.json(result);
   } catch (error) {
     console.error("Lỗi khi cập nhật lời mời:", error);
+
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
+
     res.status(500).send("Lỗi khi cập nhật lời mời");
   }
 }

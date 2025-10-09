@@ -10,7 +10,10 @@ app.use("/api/auth", require("./app/api/auth/auth.routes"));
 app.use("/api/book", require("./app/api/book/book.routes"));
 app.use("/api/library", require("./app/api/library/library.routes"));
 app.use("/api/room", require("./app/api/room/room.routes"));
-app.use("/api/notification", require("./app/api/notification/notification.routes"));
+app.use(
+  "/api/notification",
+  require("./app/api/notification/notification.routes")
+);
 
 module.exports = app;
 
@@ -118,7 +121,7 @@ function normalizeDate(date) {
 //Auto check quá hạn nhận sách
 const TheoDoiMuonSach = require("./app/models/theodoimuonsachModel");
 const QuyDinhMuonSach = require("./app/models/quydinhmuonsachModel");
-const { updateBorrowStatus } = require("./app/api/book/book.service"); 
+const { updateBorrowStatus } = require("./app/api/book/book.service");
 
 function normalizeDate(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -192,9 +195,13 @@ function normalizeDate(date) {
     }
 
     if (updatedCount > 0) {
-      console.log(`✅ Đã chuyển ${updatedCount} lượt mượn sang trạng thái "overdue"`);
+      console.log(
+        `✅ Đã chuyển ${updatedCount} lượt mượn sang trạng thái "overdue"`
+      );
     } else {
-      console.log("✅ Hôm nay đã kiểm tra quá hạn rồi, không có gì để cập nhật");
+      console.log(
+        "✅ Hôm nay đã kiểm tra quá hạn rồi, không có gì để cập nhật"
+      );
     }
   } catch (err) {
     console.error("❌ Lỗi khi auto check quá hạn:", err.message);
@@ -227,7 +234,9 @@ function normalizeDate(date) {
       if (ngaySuDung < today) {
         booking.TrangThai = "no_show";
         await booking.save();
-        console.log(`📅 Đặt phòng ${booking._id} đã quá ngày sử dụng, chuyển sang no_show`);
+        console.log(
+          `📅 Đặt phòng ${booking._id} đã quá ngày sử dụng, chuyển sang no_show`
+        );
         countNoShow++;
         continue;
       }
@@ -242,19 +251,142 @@ function normalizeDate(date) {
         if (now > endTime) {
           booking.TrangThai = "no_show";
           await booking.save();
-          console.log(`⏰ Đặt phòng ${booking._id} đã qua giờ kết thúc, chuyển sang no_show`);
+          console.log(
+            `⏰ Đặt phòng ${booking._id} đã qua giờ kết thúc, chuyển sang no_show`
+          );
           countNoShow++;
         }
       }
     }
 
     if (countNoShow > 0) {
-      console.log(`✅ Đã cập nhật ${countNoShow} lượt đặt phòng sang trạng thái "no_show"`);
+      console.log(
+        `✅ Đã cập nhật ${countNoShow} lượt đặt phòng sang trạng thái "no_show"`
+      );
     } else {
       console.log("✅ Không có phòng nào cần chuyển sang no_show hôm nay.");
     }
   } catch (err) {
     console.error("❌ Lỗi khi auto check no_show:", err.message);
+  }
+})();
+
+// Auto check phòng pending quá giờ → denied
+(async () => {
+  try {
+    const now = new Date();
+    const today = normalizeDate(now);
+
+    // Lấy danh sách đặt phòng đang pending
+    const pendingBookings = await TheoDoiDatPhong.find({
+      TrangThai: "pending",
+    });
+
+    let countDenied = 0;
+
+    for (const booking of pendingBookings) {
+      const ngaySuDung = normalizeDate(new Date(booking.NgaySuDung));
+
+      // Nếu ngày sử dụng < hôm nay → denied
+      if (ngaySuDung < today) {
+        booking.TrangThai = "denied";
+        await booking.save();
+        console.log(
+          `📅 Đặt phòng ${booking._id} đã quá ngày sử dụng, chuyển sang denied`
+        );
+        countDenied++;
+        continue;
+      }
+
+      // Nếu ngày sử dụng là hôm nay → kiểm tra giờ bắt đầu
+      if (ngaySuDung.getTime() === today.getTime()) {
+        const [startHour, startMinute] =
+          booking.GioBatDau.split(":").map(Number);
+        const startTime = new Date(ngaySuDung);
+        startTime.setHours(startHour, startMinute, 0, 0);
+
+        if (now >= startTime) {
+          booking.TrangThai = "denied";
+          await booking.save();
+          console.log(
+            `⏰ Đặt phòng ${booking._id} đã tới giờ bắt đầu mà chưa duyệt, chuyển sang denied`
+          );
+          countDenied++;
+        }
+      }
+    }
+
+    if (countDenied > 0) {
+      console.log(
+        `✅ Đã cập nhật ${countDenied} lượt đặt phòng sang trạng thái "denied"`
+      );
+    } else {
+      console.log("✅ Không có phòng pending nào cần chuyển sang denied.");
+    }
+  } catch (err) {
+    console.error("❌ Lỗi khi auto check pending → denied:", err.message);
+  }
+})();
+
+// Auto check phòng waiting_members quá giờ → canceled
+(async () => {
+  try {
+    const now = new Date();
+    const today = normalizeDate(now);
+
+    // Lấy danh sách đặt phòng đang waiting_members
+    const waitingBookings = await TheoDoiDatPhong.find({
+      TrangThai: "waiting_members",
+    });
+
+    let countCanceled = 0;
+
+    for (const booking of waitingBookings) {
+      const ngaySuDung = normalizeDate(new Date(booking.NgaySuDung));
+
+      // Nếu ngày sử dụng < hôm nay → canceled
+      if (ngaySuDung < today) {
+        booking.TrangThai = "canceled";
+        await booking.save();
+        console.log(
+          `📅 Đặt phòng ${booking._id} đã quá ngày sử dụng, chuyển sang canceled`
+        );
+        countCanceled++;
+        continue;
+      }
+
+      // Nếu ngày sử dụng là hôm nay → kiểm tra giờ bắt đầu
+      if (ngaySuDung.getTime() === today.getTime()) {
+        const [startHour, startMinute] =
+          booking.GioBatDau.split(":").map(Number);
+        const startTime = new Date(ngaySuDung);
+        startTime.setHours(startHour, startMinute, 0, 0);
+
+        if (now >= startTime) {
+          booking.TrangThai = "canceled";
+          await booking.save();
+          console.log(
+            `⏰ Đặt phòng ${booking._id} đã tới giờ bắt đầu mà vẫn chờ thành viên, chuyển sang canceled`
+          );
+          countCanceled++;
+        }
+      }
+    }
+
+    if (countCanceled > 0) {
+      console.log(
+        `✅ Đã cập nhật ${countCanceled} lượt đặt phòng sang trạng thái "canceled"`
+      );
+    } else {
+      console.log(
+        "✅ Không có phòng waiting_members nào cần chuyển sang canceled."
+      );
+    }
+  } catch (err) {
+    console.error(
+      "❌ Lỗi khi auto check waiting_members → canceled:",
+      err.message
+    );
   }
 })();
 
@@ -403,7 +535,6 @@ function normalizeDate(date) {
 //     console.error("❌ Lỗi:", err.message);
 //   }
 // })();
-
 
 //----------------------Rating Book 2 Weeks-------------------------
 // const DanhGiaSach = require('./app/models/danhgiasachModel');
