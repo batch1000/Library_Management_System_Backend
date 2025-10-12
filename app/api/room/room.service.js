@@ -7,6 +7,8 @@ const TheoDoiDatPhong = require("../../models/theodoimuonphongModel");
 const QuyDinhPhongHoc = require("../../models/quydinhphonghocModel");
 const DocGia = require("../../models/docgiaModel");
 
+const notificationService = require("../notification/notification.service");
+
 const {
   deleteImageFromCloudinary,
 } = require("../../services/cloudinary.service");
@@ -356,15 +358,73 @@ async function approveBooking(bookingId) {
     throw new Error("Thiếu bookingId để duyệt.");
   }
 
-  // Tìm booking và cập nhật trạng thái
+  // Tìm booking cần duyệt
+  const booking = await TheoDoiDatPhong.findById(bookingId).populate(
+    "PhongHoc"
+  );
+
+  if (!booking) {
+    throw new Error("Không tìm thấy booking.");
+  }
+
+  if (booking.TrangThai !== "pending") {
+    throw new Error("Chỉ có thể duyệt booking đang ở trạng thái pending.");
+  }
+
+  // ===== TÌM VÀ TỪ CHỐI TẤT CẢ BOOKING PENDING KHÁC TRÙNG PHÒNG, NGÀY, GIỜ =====
+  const conflictingBookings = await TheoDoiDatPhong.find({
+    _id: { $ne: bookingId }, // Không phải booking hiện tại
+    PhongHoc: booking.PhongHoc,
+    NgaySuDung: booking.NgaySuDung,
+    TrangThai: "pending", // Chỉ lấy pending
+  }).populate("PhongHoc");
+
+  // Lọc các booking trùng giờ
+  const pendingConflicts = conflictingBookings.filter((b) =>
+    checkTimeOverlap(
+      booking.GioBatDau,
+      booking.GioKetThuc,
+      b.GioBatDau,
+      b.GioKetThuc
+    )
+  );
+
+  // Từ chối tất cả booking pending trùng giờ
+  for (const conflictBooking of pendingConflicts) {
+    conflictBooking.TrangThai = "denied";
+    await conflictBooking.save();
+
+    // Gửi thông báo cho người bị từ chối
+    try {
+      await notificationService.createNotification({
+        DocGia: conflictBooking.DocGia,
+        TieuDe: "Đặt phòng bị từ chối",
+        NoiDung: `Đặt phòng ${
+          conflictBooking.PhongHoc.TenPhong || "phòng học"
+        } vào ngày ${conflictBooking.NgaySuDung.toLocaleDateString(
+          "vi-VN"
+        )} lúc ${conflictBooking.GioBatDau} - ${
+          conflictBooking.GioKetThuc
+        } đã bị từ chối do phòng đã được đặt bởi người khác.`,
+        LoaiThongBao: "error",
+      });
+    } catch (notifErr) {
+      console.error(
+        `Lỗi tạo thông báo cho booking ${conflictBooking._id}:`,
+        notifErr.message
+      );
+    }
+  }
+
+  // ===== DUYỆT BOOKING =====
   const updatedBooking = await TheoDoiDatPhong.findByIdAndUpdate(
     bookingId,
     {
       TrangThai: "approved",
       NgayDuyet: new Date(),
     },
-    { new: true } // Trả về document sau khi update
-  );
+    { new: true }
+  ).populate("PhongHoc");
 
   return updatedBooking;
 }
@@ -582,7 +642,6 @@ async function respondToInvitation(bookingId, memberId, status) {
   }
 }
 
-// Hàm helper kiểm tra trùng giờ
 function checkTimeOverlap(start1, end1, start2, end2) {
   return start1 < end2 && start2 < end1;
 }

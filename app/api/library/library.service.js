@@ -11,6 +11,8 @@ const ThongTinGiaHan = require("../../models/thongtingiahanModel");
 const ThongTinCapLaiThe = require("../../models/thongtincaplaitheModel");
 const QuyDinhThuVien = require("../../models/quydinhthuvienModel");
 
+const notificationService = require("../notification/notification.service");
+
 async function getLibraryCard(MaDocGia) {
   try {
     if (!MaDocGia) throw new Error("Chưa cung cấp MaDocGia");
@@ -190,7 +192,7 @@ async function renewLibraryCard(cardId) {
         NgayKiemTraHetHan: null, // Reset ngày kiểm tra hết hạn
       },
       { new: true }
-    );
+    ).populate("DocGia");
 
     if (!updatedCard) {
       throw new Error("Không tìm thấy thẻ thư viện");
@@ -202,6 +204,18 @@ async function renewLibraryCard(cardId) {
       { NgayGiaHan: currentDate },
       { new: true }
     );
+
+    // Tạo thông báo cho độc giả
+    if (updatedCard.DocGia) {
+      const ngayHetHanMoi = newExpiryDate.toLocaleDateString("vi-VN");
+
+      await notificationService.createNotification({
+        DocGia: updatedCard.DocGia._id,
+        TieuDe: "Gia hạn thẻ thư viện thành công",
+        NoiDung: `Thẻ thư viện của bạn đã được gia hạn thành công. Ngày hết hạn mới: ${ngayHetHanMoi}.`,
+        LoaiThongBao: "success",
+      });
+    }
 
     return updatedExtendInfo;
   } catch (error) {
@@ -335,10 +349,24 @@ async function approveReissueCard(maThe) {
         new: true,
         sort: { createdAt: -1 }, // lấy bản ghi mới nhất
       }
-    );
+    ).populate({
+      path: "MaThe",
+      populate: {
+        path: "DocGia",
+      },
+    });
 
     if (!request) {
       throw new Error("Không tìm thấy yêu cầu cấp lại thẻ");
+    }
+
+    if (request.MaThe && request.MaThe.DocGia) {
+      await notificationService.createNotification({
+        DocGia: request.MaThe.DocGia._id,
+        TieuDe: "Yêu cầu làm lại thẻ được duyệt",
+        NoiDung: `Yêu cầu làm lại thẻ thư viện của bạn đã được phê duyệt. Vui lòng đến thư viện để nhận thẻ mới.`,
+        LoaiThongBao: "success",
+      });
     }
 
     return request;
@@ -386,10 +414,25 @@ async function denyReissueCard(maThe) {
         new: true,
         sort: { createdAt: -1 }, // lấy bản ghi mới nhất
       }
-    );
+    ).populate({
+      path: 'MaThe',
+      populate: {
+        path: 'DocGia'
+      }
+    });
 
     if (!request) {
       throw new Error("Không tìm thấy yêu cầu cấp lại thẻ");
+    }
+
+    // Tạo thông báo cho độc giả
+    if (request.MaThe && request.MaThe.DocGia) {
+      await notificationService.createNotification({
+        DocGia: request.MaThe.DocGia._id,
+        TieuDe: 'Yêu cầu làm lại thẻ bị từ chối',
+        NoiDung: `Yêu cầu làm lại thẻ thư viện của bạn đã bị từ chối.`,
+        LoaiThongBao: 'error',
+      });
     }
 
     return request;
@@ -420,8 +463,8 @@ async function updateCardRule(ruleUpdates) {
         },
       },
       {
-        new: true,   // trả về document sau khi update
-        upsert: true // nếu chưa có thì tạo mới
+        new: true, // trả về document sau khi update
+        upsert: true, // nếu chưa có thì tạo mới
       }
     );
 
@@ -431,7 +474,6 @@ async function updateCardRule(ruleUpdates) {
     throw err;
   }
 }
-
 
 module.exports = {
   getLibraryCard,
@@ -446,5 +488,5 @@ module.exports = {
   printCard,
   denyReissueCard,
   getCardRule,
-  updateCardRule
+  updateCardRule,
 };

@@ -17,6 +17,8 @@ app.use(
 
 module.exports = app;
 
+const notificationService = require("./app/api/notification/notification.service");
+
 // Auto check hạn của thẻ thư viện
 const TheThuVien = require("./app/models/thethuvienModel");
 const ThongTinGiaHan = require("./app/models/thongtingiahanModel");
@@ -56,6 +58,23 @@ function normalizeDate(date) {
         PhiGiaHan: renewalFee, // giả sử phí cố định
       });
 
+      // THÔNG BÁO Ở ĐÂY
+      try {
+        await notificationService.createNotification({
+          DocGia: card.DocGia,
+          TieuDe: "Thẻ thư viện hết hạn",
+          NoiDung: `Thẻ thư viện của bạn đã hết hạn. Vui lòng gia hạn để tiếp tục sử dụng dịch vụ. Phí gia hạn: ${renewalFee.toLocaleString(
+            "vi-VN"
+          )}đ`,
+          LoaiThongBao: "error",
+        });
+      } catch (notifErr) {
+        console.error(
+          `Lỗi tạo thông báo cho thẻ ${card.MaThe}:`,
+          notifErr.message
+        );
+      }
+
       updatedCount++;
     }
 
@@ -81,12 +100,16 @@ function normalizeDate(date) {
 (async () => {
   try {
     const quyDinh = await QuyDinhThuVien.findOne({});
-    const printWaitingDays = (quyDinh && quyDinh.printWaitingDays) || 3;
+    const printWaitingDays = quyDinh && quyDinh.printWaitingDays;
 
     // Lấy tất cả yêu cầu cấp lại thẻ đã được duyệt nhưng chưa in
+    // ✅ POPULATE NGAY TỪ ĐẦU
     const approvedRequests = await ThongTinCapLaiThe.find({
       TrangThai: "approve",
       NgayDuyet: { $ne: null },
+    }).populate({
+      path: "MaThe",
+      select: "DocGia MaThe", // Chỉ lấy field cần thiết
     });
 
     const today = normalizeDate(new Date());
@@ -98,7 +121,33 @@ function normalizeDate(date) {
       const diffTime = today.getTime() - ngayDuyet.getTime();
       const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
+  //     console.log(`
+  // ➤ Yêu cầu ID: ${request._id}
+  // ├─ Ngày duyệt: ${ngayDuyet.toLocaleDateString("vi-VN")}
+  // ├─ Hôm nay: ${today.toLocaleDateString("vi-VN")}
+  // ├─ Số ngày chênh lệch: ${diffDays}
+  // ├─ Giới hạn cho phép (printWaitingDays): ${printWaitingDays}
+  // └─ Kết luận: ${diffDays > printWaitingDays ? "❌ Quá hạn" : "✅ Còn hạn"}
+  // `);
+
       if (diffDays > printWaitingDays) {
+        // ✅ TẠO THÔNG BÁO TRƯỚC KHI SAVE (vì đã có dữ liệu populate)
+        try {
+          if (request.MaThe && request.MaThe.DocGia) {
+            await notificationService.createNotification({
+              DocGia: request.MaThe.DocGia,
+              TieuDe: "Yêu cầu cấp lại thẻ bị từ chối",
+              NoiDung: `Yêu cầu cấp lại thẻ thư viện của bạn đã bị từ chối do quá thời gian chờ in (${printWaitingDays} ngày). Vui lòng liên hệ thư viện để được hỗ trợ.`,
+              LoaiThongBao: "error",
+            });
+          }
+        } catch (notifErr) {
+          console.error(
+            `Lỗi tạo thông báo cho yêu cầu ${request._id}:`,
+            notifErr.message
+          );
+        }
+
         // Quá hạn chờ in thẻ → chuyển sang denied
         request.TrangThai = "denied";
         await request.save();
@@ -106,6 +155,7 @@ function normalizeDate(date) {
         console.log(
           `Yêu cầu cấp lại thẻ ${request._id} đã quá hạn in, chuyển sang denied`
         );
+
         hasLate = true;
       }
     }
@@ -136,7 +186,7 @@ function normalizeDate(date) {
     const processingRequests = await TheoDoiMuonSach.find({
       TrangThai: "processing",
       NgayDuyet: { $ne: null },
-    });
+    }).populate("MaSach", "TenSach");
 
     const today = normalizeDate(new Date());
     let hasLate = false;
@@ -154,6 +204,19 @@ function normalizeDate(date) {
           `Yêu cầu ${request._id} đã quá hạn nhận sách, chuyển sang denied`
         );
         hasLate = true;
+
+        //Tạo thông báo
+        try {
+          const sach = request.MaSach.TenSach;
+          await notificationService.createNotification({
+            DocGia: request.MaDocGia._id,
+            TieuDe: "Yêu cầu mượn sách bị hủy do quá hạn nhận",
+            NoiDung: `Yêu cầu mượn sách "${sach}" đã bị hủy vì bạn không đến nhận trong ${pickupDeadlineDays} ngày kể từ khi được duyệt.`,
+            LoaiThongBao: "warning",
+          });
+        } catch (notifyErr) {
+          console.error("❌ Lỗi khi tạo thông báo:", notifyErr);
+        }
       }
     }
 
@@ -166,45 +229,86 @@ function normalizeDate(date) {
 })();
 
 // Auto check sách mượn quá hạn
-function normalizeDate(date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
 (async () => {
   try {
-    const now = new Date();
-    const today = normalizeDate(now);
+    const today = normalizeDate(new Date());
+    let hasLog = false;
 
-    // Lấy các lượt mượn đã duyệt, chưa được check hôm nay
-    const overdueBorrows = await TheoDoiMuonSach.find({
+    // Lấy tất cả lượt mượn đang ở trạng thái "approved"
+    const approvedBorrows = await TheoDoiMuonSach.find({
       TrangThai: "approved",
-      NgayTra: { $lt: today },
-      $or: [
-        { NgayCapNhatTinhTrangSach: null },
-        { NgayCapNhatTinhTrangSach: { $lt: today } },
-      ],
-    });
+      NgayTra: { $ne: null }, // có ngày trả
+    })
+      .populate("MaSach", "TenSach")
+      .populate("MaDocGia", "_id HoTen");
 
-    let updatedCount = 0;
+    for (const borrow of approvedBorrows) {
+      const ngayTra = normalizeDate(borrow.NgayTra);
 
-    for (const borrow of overdueBorrows) {
-      borrow.TrangThai = "overdue";
-      borrow.NgayCapNhatTinhTrangSach = now; // ghi nhận ngày đã check
-      await borrow.save();
-      updatedCount++;
+      const diffDays = Math.floor(
+        (ngayTra.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      // --- TH1: Còn 2 ngày ---
+      if (diffDays === 2) {
+        hasLog = true;
+        await notificationService.createNotification({
+          DocGia: borrow.MaDocGia._id,
+          TieuDe: "Nhắc nhở trả sách",
+          NoiDung: `Sách "${borrow.MaSach.TenSach}" còn 2 ngày nữa đến hạn trả.`,
+          LoaiThongBao: "info",
+        });
+      }
+
+      // --- TH2: Còn 1 ngày ---
+      else if (diffDays === 1) {
+        hasLog = true;
+        await notificationService.createNotification({
+          DocGia: borrow.MaDocGia._id,
+          TieuDe: "Sắp đến hạn trả sách",
+          NoiDung: `Sách "${borrow.MaSach.TenSach}" sẽ đến hạn trả vào ngày mai.`,
+          LoaiThongBao: "warning",
+        });
+      }
+
+      // --- TH3: Hôm nay phải trả ---
+      else if (diffDays === 0) {
+        hasLog = true;
+        await notificationService.createNotification({
+          DocGia: borrow.MaDocGia._id,
+          TieuDe: "Hôm nay là hạn trả sách",
+          NoiDung: `Hôm nay là hạn trả sách "${borrow.MaSach.TenSach}". Vui lòng hoàn trả đúng hạn để tránh phát sinh phí.`,
+          LoaiThongBao: "warning",
+        });
+      }
+
+      // --- TH4: Đã quá hạn ---
+      else if (diffDays < 0) {
+        hasLog = true;
+
+        // Cập nhật trạng thái sang "overdue"
+        borrow.TrangThai = "overdue";
+        await borrow.save();
+
+        // Gửi thông báo quá hạn
+        await notificationService.createNotification({
+          DocGia: borrow.MaDocGia._id,
+          TieuDe: "Sách mượn đã quá hạn trả",
+          NoiDung: `Sách "${
+            borrow.MaSach.TenSach
+          }" đã quá hạn trả kể từ ngày ${borrow.NgayTra.toLocaleDateString(
+            "vi-VN"
+          )}. Vui lòng hoàn trả sớm.`,
+          LoaiThongBao: "error",
+        });
+      }
     }
 
-    if (updatedCount > 0) {
-      console.log(
-        `✅ Đã chuyển ${updatedCount} lượt mượn sang trạng thái "overdue"`
-      );
-    } else {
-      console.log(
-        "✅ Hôm nay đã kiểm tra quá hạn rồi, không có gì để cập nhật"
-      );
+    if (!hasLog) {
+      console.log("✅ Không có sách nào sắp đến hạn hoặc quá hạn hôm nay.");
     }
   } catch (err) {
-    console.error("❌ Lỗi khi auto check quá hạn:", err.message);
+    console.error("❌ Lỗi khi kiểm tra hạn trả sách:", err);
   }
 })();
 
@@ -223,7 +327,7 @@ function normalizeDate(date) {
     // Lấy danh sách đặt phòng đã duyệt (approved)
     const approvedBookings = await TheoDoiDatPhong.find({
       TrangThai: "approved",
-    });
+    }).populate("PhongHoc");
 
     let countNoShow = 0;
 
@@ -238,6 +342,26 @@ function normalizeDate(date) {
           `📅 Đặt phòng ${booking._id} đã quá ngày sử dụng, chuyển sang no_show`
         );
         countNoShow++;
+
+        // ===== THÊM THÔNG BÁO Ở ĐÂY =====
+        try {
+          await notificationService.createNotification({
+            DocGia: booking.DocGia,
+            TieuDe: "Đặt phòng không được sử dụng",
+            NoiDung: `Đặt phòng ${
+              booking.PhongHoc.TenPhong || "phòng học"
+            } ngày ${booking.NgaySuDung.toLocaleDateString(
+              "vi-VN"
+            )} đã được hủy do bạn chưa đến nhận phòng đúng ngày.`,
+            LoaiThongBao: "warning",
+          });
+        } catch (notifErr) {
+          console.error(
+            `Lỗi tạo thông báo cho booking ${booking._id}:`,
+            notifErr.message
+          );
+        }
+
         continue;
       }
 
@@ -255,6 +379,25 @@ function normalizeDate(date) {
             `⏰ Đặt phòng ${booking._id} đã qua giờ kết thúc, chuyển sang no_show`
           );
           countNoShow++;
+
+          // ===== THÊM THÔNG BÁO Ở ĐÂY =====
+          try {
+            await notificationService.createNotification({
+              DocGia: booking.DocGia,
+              TieuDe: "Đặt phòng không được sử dụng",
+              NoiDung: `Đặt phòng ${
+                booking.PhongHoc.TenPhong || "phòng học"
+              } ngày ${booking.NgaySuDung.toLocaleDateString("vi-VN")} từ ${
+                booking.GioBatDau
+              } đến ${booking.GioKetThuc} đã bị hủy do bạn không đến sử dụng.`,
+              LoaiThongBao: "warning",
+            });
+          } catch (notifErr) {
+            console.error(
+              `Lỗi tạo thông báo cho booking ${booking._id}:`,
+              notifErr.message
+            );
+          }
         }
       }
     }
@@ -280,7 +423,7 @@ function normalizeDate(date) {
     // Lấy danh sách đặt phòng đang pending
     const pendingBookings = await TheoDoiDatPhong.find({
       TrangThai: "pending",
-    });
+    }).populate("PhongHoc");
 
     let countDenied = 0;
 
@@ -295,6 +438,26 @@ function normalizeDate(date) {
           `📅 Đặt phòng ${booking._id} đã quá ngày sử dụng, chuyển sang denied`
         );
         countDenied++;
+
+        // ===== THÊM THÔNG BÁO =====
+        try {
+          await notificationService.createNotification({
+            DocGia: booking.DocGia,
+            TieuDe: "Đặt phòng bị từ chối",
+            NoiDung: `Đặt phòng ${
+              booking.PhongHoc.TenPhong || "phòng học"
+            } vào ngày ${booking.NgaySuDung.toLocaleDateString(
+              "vi-VN"
+            )} đã bị từ chối do quá thời gian chờ duyệt.`,
+            LoaiThongBao: "error",
+          });
+        } catch (notifErr) {
+          console.error(
+            `Lỗi tạo thông báo cho booking ${booking._id}:`,
+            notifErr.message
+          );
+        }
+
         continue;
       }
 
@@ -312,6 +475,27 @@ function normalizeDate(date) {
             `⏰ Đặt phòng ${booking._id} đã tới giờ bắt đầu mà chưa duyệt, chuyển sang denied`
           );
           countDenied++;
+
+          // ===== THÊM THÔNG BÁO =====
+          try {
+            await notificationService.createNotification({
+              DocGia: booking.DocGia,
+              TieuDe: "Đặt phòng bị từ chối",
+              NoiDung: `Đặt phòng ${
+                booking.PhongHoc.TenPhong || "phòng học"
+              } vào ngày ${booking.NgaySuDung.toLocaleDateString(
+                "vi-VN"
+              )} lúc ${booking.GioBatDau} - ${
+                booking.GioKetThuc
+              } đã bị từ chối do chưa được duyệt đúng giờ.`,
+              LoaiThongBao: "error",
+            });
+          } catch (notifErr) {
+            console.error(
+              `Lỗi tạo thông báo cho booking ${booking._id}:`,
+              notifErr.message
+            );
+          }
         }
       }
     }
@@ -337,7 +521,7 @@ function normalizeDate(date) {
     // Lấy danh sách đặt phòng đang waiting_members
     const waitingBookings = await TheoDoiDatPhong.find({
       TrangThai: "waiting_members",
-    });
+    }).populate("PhongHoc");
 
     let countCanceled = 0;
 
@@ -346,12 +530,65 @@ function normalizeDate(date) {
 
       // Nếu ngày sử dụng < hôm nay → canceled
       if (ngaySuDung < today) {
+        // ===== LƯU DANH SÁCH THÀNH VIÊN CHƯA PHẢN HỒI TRƯỚC KHI THAY ĐỔI =====
+        const invitedMembers = booking.ThanhVien.filter(
+          (member) => member.TrangThai === "invited" && member.DocGia
+        );
+
+        // ===== TỰ ĐỘNG DECLINED CÁC THÀNH VIÊN CHƯA PHẢN HỒI =====
+        booking.ThanhVien.forEach((member) => {
+          if (member.TrangThai === "invited") {
+            member.TrangThai = "declined";
+          }
+        });
+
         booking.TrangThai = "canceled";
         await booking.save();
         console.log(
           `📅 Đặt phòng ${booking._id} đã quá ngày sử dụng, chuyển sang canceled`
         );
         countCanceled++;
+
+        // ===== THÔNG BÁO CHO NGƯỜI TẠO PHÒNG =====
+        try {
+          await notificationService.createNotification({
+            DocGia: booking.DocGia,
+            TieuDe: "Đặt phòng nhóm bị hủy",
+            NoiDung: `Đặt phòng nhóm ${
+              booking.PhongHoc.TenPhong || "phòng học"
+            } vào ngày ${booking.NgaySuDung.toLocaleDateString(
+              "vi-VN"
+            )} đã bị hủy do quá thời gian chờ thành viên xác nhận.`,
+            LoaiThongBao: "error",
+          });
+        } catch (notifErr) {
+          console.error(
+            `Lỗi tạo thông báo cho người tạo booking ${booking._id}:`,
+            notifErr.message
+          );
+        }
+
+        // ===== THÔNG BÁO CHO CÁC THÀNH VIÊN CHƯA PHẢN HỒI =====
+        for (const member of invitedMembers) {
+          try {
+            await notificationService.createNotification({
+              DocGia: member.DocGia,
+              TieuDe: "Lời mời đặt phòng nhóm đã hết hạn",
+              NoiDung: `Lời mời tham gia phòng nhóm ${
+                booking.PhongHoc.TenPhong || "phòng học"
+              } vào ngày ${booking.NgaySuDung.toLocaleDateString(
+                "vi-VN"
+              )} đã hết hạn do bạn chưa phản hồi.`,
+              LoaiThongBao: "warning",
+            });
+          } catch (notifErr) {
+            console.error(
+              `Lỗi tạo thông báo cho thành viên ${member.DocGia}:`,
+              notifErr.message
+            );
+          }
+        }
+
         continue;
       }
 
@@ -363,12 +600,68 @@ function normalizeDate(date) {
         startTime.setHours(startHour, startMinute, 0, 0);
 
         if (now >= startTime) {
+          // ===== LƯU DANH SÁCH THÀNH VIÊN CHƯA PHẢN HỒI TRƯỚC KHI THAY ĐỔI =====
+          const invitedMembers = booking.ThanhVien.filter(
+            (member) => member.TrangThai === "invited" && member.DocGia
+          );
+
+          // ===== TỰ ĐỘNG DECLINED CÁC THÀNH VIÊN CHƯA PHẢN HỒI =====
+          booking.ThanhVien.forEach((member) => {
+            if (member.TrangThai === "invited") {
+              member.TrangThai = "declined";
+            }
+          });
+
           booking.TrangThai = "canceled";
           await booking.save();
           console.log(
             `⏰ Đặt phòng ${booking._id} đã tới giờ bắt đầu mà vẫn chờ thành viên, chuyển sang canceled`
           );
           countCanceled++;
+
+          // ===== THÔNG BÁO CHO NGƯỜI TẠO PHÒNG =====
+          try {
+            await notificationService.createNotification({
+              DocGia: booking.DocGia,
+              TieuDe: "Đặt phòng nhóm bị hủy",
+              NoiDung: `Đặt phòng nhóm ${
+                booking.PhongHoc.TenPhong || "phòng học"
+              } vào ngày ${booking.NgaySuDung.toLocaleDateString(
+                "vi-VN"
+              )} lúc ${booking.GioBatDau} - ${
+                booking.GioKetThuc
+              } đã bị hủy do chưa đủ thành viên xác nhận đúng giờ.`,
+              LoaiThongBao: "error",
+            });
+          } catch (notifErr) {
+            console.error(
+              `Lỗi tạo thông báo cho người tạo booking ${booking._id}:`,
+              notifErr.message
+            );
+          }
+
+          // ===== THÔNG BÁO CHO CÁC THÀNH VIÊN CHƯA PHẢN HỒI =====
+          for (const member of invitedMembers) {
+            try {
+              await notificationService.createNotification({
+                DocGia: member.DocGia,
+                TieuDe: "Lời mời đặt phòng nhóm đã hết hạn",
+                NoiDung: `Lời mời tham gia phòng nhóm ${
+                  booking.PhongHoc.TenPhong || "phòng học"
+                } vào ngày ${booking.NgaySuDung.toLocaleDateString(
+                  "vi-VN"
+                )} lúc ${booking.GioBatDau} - ${
+                  booking.GioKetThuc
+                } đã hết hạn do bạn chưa phản hồi.`,
+                LoaiThongBao: "warning",
+              });
+            } catch (notifErr) {
+              console.error(
+                `Lỗi tạo thông báo cho thành viên ${member.DocGia}:`,
+                notifErr.message
+              );
+            }
+          }
         }
       }
     }

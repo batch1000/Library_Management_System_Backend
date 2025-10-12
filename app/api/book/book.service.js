@@ -14,6 +14,9 @@ const LuanVan = require("../../models/luanvanModel");
 const SinhVien = require("../../models/sinhvienModel");
 const Khoa = require("../../models/khoaModel");
 
+const notificationService = require("../notification/notification.service");
+
+
 const {
   deleteImageFromCloudinary,
 } = require("../../services/cloudinary.service");
@@ -1952,11 +1955,27 @@ async function getAllThesis() {
 
 async function approveThesis(thesisId) {
   try {
-    return await LuanVan.findByIdAndUpdate(
+    const thesis = await LuanVan.findByIdAndUpdate(
       thesisId,
       { TrangThai: "Đã duyệt", NgayNop: new Date() },
       { new: true }
-    ).lean();
+    ).populate('MaDocGia'); // ✅ THÊM populate để lấy thông tin DocGia
+
+    if (!thesis) {
+      throw new Error("Không tìm thấy luận văn");
+    }
+
+    // Tạo thông báo cho độc giả
+    if (thesis.MaDocGia) {
+      await notificationService.createNotification({
+        DocGia: thesis.MaDocGia._id,
+        TieuDe: 'Luận văn được duyệt',
+        NoiDung: `Luận văn "${thesis.TieuDeTai}" của bạn đã được phê duyệt và đưa vào thư viện.`,
+        LoaiThongBao: 'success',
+      });
+    }
+
+    return thesis;
   } catch (err) {
     throw err;
   }
@@ -1964,11 +1983,27 @@ async function approveThesis(thesisId) {
 
 async function rejectThesis(thesisId) {
   try {
-    return await LuanVan.findByIdAndUpdate(
+    const thesis = await LuanVan.findByIdAndUpdate(
       thesisId,
       { TrangThai: "Từ chối" },
       { new: true }
-    ).lean();
+    ).populate('MaDocGia'); // ✅ THÊM populate để lấy thông tin DocGia
+
+    if (!thesis) {
+      throw new Error("Không tìm thấy luận văn");
+    }
+
+    // Tạo thông báo cho độc giả
+    if (thesis.MaDocGia) {
+      await notificationService.createNotification({
+        DocGia: thesis.MaDocGia._id,
+        TieuDe: 'Luận văn bị từ chối',
+        NoiDung: `Luận văn "${thesis.TieuDeTai}" của bạn đã bị từ chối. Vui lòng liên hệ thư viện để biết thêm chi tiết.`,
+        LoaiThongBao: 'error',
+      });
+    }
+
+    return thesis;
   } catch (err) {
     throw err;
   }
