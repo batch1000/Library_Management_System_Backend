@@ -1,4 +1,5 @@
 const express = require('express')
+const uploadExcel = require('../../config/multerExcel');
 const upload = require('../../config/multer');
 const
     {   
@@ -13,7 +14,11 @@ const
         denyReissueCard,
         printCard,
         getCardRule,
-        updateCardRule
+        updateCardRule,
+        getAllLibraryCards,
+        uploadLibraryCardsExcelForLecturers,
+        uploadLibraryCardsExcelForStudents
+
     } = require('./library.controller')
 
 const router = express.Router();
@@ -31,5 +36,9 @@ router.post('/printCard', printCard);
 
 router.get("/getCardRule", getCardRule)
 router.post("/updateCardRule", updateCardRule)
+
+router.get("/getAllLibraryCards", getAllLibraryCards)
+router.post("/uploadLibraryCardsExcelForLecturers", uploadExcel.single('file'), uploadLibraryCardsExcelForLecturers);
+router.post("/uploadLibraryCardsExcelForStudents", uploadExcel.single('file'), uploadLibraryCardsExcelForStudents);
 
 module.exports = router;

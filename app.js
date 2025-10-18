@@ -18,6 +18,7 @@ app.use(
 module.exports = app;
 
 const notificationService = require("./app/api/notification/notification.service");
+const DocGia = require("./app/models/docgiaModel");
 
 // Auto check hạn của thẻ thư viện
 const TheThuVien = require("./app/models/thethuvienModel");
@@ -42,23 +43,39 @@ function normalizeDate(date) {
 
     let updatedCount = 0;
 
+    // Lấy quy định thư viện (chỉ nên có 1 bản ghi)
     const rule = await QuyDinhThuVien.findOne();
-    let renewalFee = 25000; // fallback mặc định
-    if (rule && rule.renewalFee) {
-      renewalFee = rule.renewalFee;
-    }
 
     for (const card of expiredCards) {
+      // 🔹 Lấy thông tin độc giả để biết là GV hay SV
+      const docGia = await DocGia.findById(card.DocGia);
+      if (!docGia) {
+        console.warn(`⚠️ Không tìm thấy DocGia cho thẻ ${card.MaThe}`);
+        continue;
+      }
+
+      // 🔹 Xác định phí gia hạn theo đối tượng
+      let renewalFee = 10000; // fallback mặc định
+      if (rule) {
+        if (docGia.DoiTuong === "Giảng viên") {
+          renewalFee = rule.renewalFeeLecturer;
+        } else if (docGia.DoiTuong === "Sinh viên") {
+          renewalFee = rule.renewalFee;
+        }
+      }
+
+      // 🔹 Cập nhật trạng thái thẻ
       card.TrangThai = "Hết hạn";
-      card.NgayKiemTraHetHan = now; // ghi lại ngày đã check
+      card.NgayKiemTraHetHan = now;
       await card.save();
 
+      // 🔹 Ghi log gia hạn
       await ThongTinGiaHan.create({
         MaThe: card._id,
-        PhiGiaHan: renewalFee, // giả sử phí cố định
+        PhiGiaHan: renewalFee,
       });
 
-      // THÔNG BÁO Ở ĐÂY
+      // 🔹 Gửi thông báo
       try {
         await notificationService.createNotification({
           DocGia: card.DocGia,
@@ -100,7 +117,7 @@ function normalizeDate(date) {
 (async () => {
   try {
     const quyDinh = await QuyDinhThuVien.findOne({});
-    const printWaitingDays = quyDinh && quyDinh.printWaitingDays;
+    if (!quyDinh) throw new Error("Chưa có quy định thư viện");
 
     // Lấy tất cả yêu cầu cấp lại thẻ đã được duyệt nhưng chưa in
     // ✅ POPULATE NGAY TỪ ĐẦU
@@ -118,17 +135,22 @@ function normalizeDate(date) {
     for (const request of approvedRequests) {
       const ngayDuyet = normalizeDate(request.NgayDuyet);
 
+      let printWaitingDays;
+      if (request.MaThe && request.MaThe.DocGia) {
+        const docGia = await DocGia.findById(request.MaThe.DocGia).select(
+          "DoiTuong"
+        );
+        if (docGia) {
+          if (docGia.DoiTuong === "Giảng viên") {
+            printWaitingDays = quyDinh.printWaitingDaysLecturer;
+          } else {
+            printWaitingDays = quyDinh.printWaitingDays;
+          }
+        }
+      }
+
       const diffTime = today.getTime() - ngayDuyet.getTime();
       const diffDays = diffTime / (1000 * 60 * 60 * 24);
-
-  //     console.log(`
-  // ➤ Yêu cầu ID: ${request._id}
-  // ├─ Ngày duyệt: ${ngayDuyet.toLocaleDateString("vi-VN")}
-  // ├─ Hôm nay: ${today.toLocaleDateString("vi-VN")}
-  // ├─ Số ngày chênh lệch: ${diffDays}
-  // ├─ Giới hạn cho phép (printWaitingDays): ${printWaitingDays}
-  // └─ Kết luận: ${diffDays > printWaitingDays ? "❌ Quá hạn" : "✅ Còn hạn"}
-  // `);
 
       if (diffDays > printWaitingDays) {
         // ✅ TẠO THÔNG BÁO TRƯỚC KHI SAVE (vì đã có dữ liệu populate)
@@ -684,7 +706,6 @@ function normalizeDate(date) {
 })();
 
 // const QuyDinhPhongHoc = require('./app/models/quydinhphonghocModel');
-
 // (async () => {
 //   try {
 //     // Tạo dữ liệu mẫu (giống default trong schema)
@@ -698,6 +719,7 @@ function normalizeDate(date) {
 //     console.error("❌ Lỗi:", err.message);
 //   }
 // })();
+
 // const DocGia = require('./app/models/docgiaModel'); // chỉnh lại đường dẫn nếu khác
 // (async () => {
 //     try {
@@ -715,7 +737,6 @@ function normalizeDate(date) {
 // })();
 
 // const DocGia = require('./app/models/docgiaModel'); // chỉnh lại đường dẫn nếu khác
-
 // (async () => {
 //     try {
 //         const readers = await DocGia.find();
@@ -732,7 +753,6 @@ function normalizeDate(date) {
 // })();
 
 // const libraryService = require('./app/api/library/library.service');
-
 // const SinhVien = require('./app/models/sinhvienModel');
 // const NienKhoa = require('./app/models/nienkhoaModel');
 // const NganhHoc = require('./app/models/nganhhocModel');
@@ -795,43 +815,8 @@ function normalizeDate(date) {
 //   }
 // })();
 
-// const Sach = require('./app/models/sachModel');
-// (async () => {
-//     try {
-//         const books = await Sach.find();
-
-//         console.log(`📌 Tổng số sách: ${books.length}`);
-//         books.forEach((book, i) => {
-//             console.log(`${i + 1}. _id: ${book._id} | Tên sách: ${book.TenSach}`);
-//         });
-//     } catch (err) {
-//         console.error("❌ Lỗi:", err.message);
-//     }
-// })();
-
-// const Sach = require('./app/models/sachModel');
-
-// (async () => {
-//   try {
-//     // Cập nhật toàn bộ sách thành LoaiSach = "Sach"
-//     const result = await Sach.updateMany({}, { $set: { LoaiSach: "Sach" } });
-
-//     console.log(`✅ Đã cập nhật ${result.modifiedCount} sách.`);
-
-//     // Kiểm tra lại
-//     const books = await Sach.find();
-//     console.log(`📌 Tổng số sách: ${books.length}`);
-//     books.forEach((book, i) => {
-//       console.log(`${i + 1}. _id: ${book._id} | Tên sách: ${book.TenSach} | LoaiSach: ${book.LoaiSach}`);
-//     });
-//   } catch (err) {
-//     console.error("❌ Lỗi:", err.message);
-//   }
-// })();
-
 //----------------------Rating Book 2 Weeks-------------------------
 // const DanhGiaSach = require('./app/models/danhgiasachModel');
-
 // const readers = [
 //   { username: "thanhTran", id: "687113ca8d3f5218287b7651" },
 //   { username: "hoangTran", id: "68951fb83475df14e828916e" },

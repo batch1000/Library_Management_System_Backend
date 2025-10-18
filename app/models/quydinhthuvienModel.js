@@ -15,12 +15,33 @@ const libraryRuleSchema = new mongoose.Schema(
     printWaitingDays: {
       type: Number,
       required: true,
-      default: 3, // số ngày chờ in thẻ
+      default: 3, // số ngày chờ in thẻ nếu như không đến in
     },
     cardValidityDays: {
       type: Number,
       required: true,
       default: 365, // số ngày thẻ có hiệu lực (mặc định 1 năm)
+    },
+
+    renewalFeeLecturer: {
+      type: Number,
+      required: true,
+      default: 0, // miễn phí gia hạn
+    },
+    reissueFeeLecturer: {
+      type: Number,
+      required: true,
+      default: 50000, // ưu ái hơn sinh viên
+    },
+    printWaitingDaysLecturer: {
+      type: Number,
+      required: true,
+      default: 7, // số ngày chờ in thẻ nếu như không đến in
+    },
+    cardValidityDaysLecturer: {
+      type: Number,
+      required: true,
+      default: 730, // 2 năm
     },
   },
   {

@@ -1,4 +1,7 @@
 const mongoose = require("mongoose");
+const fs = require("fs");
+const XLSX = require("xlsx");
+const bcrypt = require("bcryptjs");
 
 const SinhVien = require("../../models/sinhvienModel");
 const NienKhoa = require("../../models/nienkhoaModel");
@@ -10,6 +13,9 @@ const TheThuVien = require("../../models/thethuvienModel");
 const ThongTinGiaHan = require("../../models/thongtingiahanModel");
 const ThongTinCapLaiThe = require("../../models/thongtincaplaitheModel");
 const QuyDinhThuVien = require("../../models/quydinhthuvienModel");
+const GiangVien = require("../../models/giangvienModel");
+const BoMon = require("../../models/bomonModel");
+const TaiKhoan = require("../../models/taikhoanModel");
 
 const notificationService = require("../notification/notification.service");
 
@@ -28,7 +34,7 @@ async function getLibraryCard(MaDocGia) {
     }
 
     // 2. Tìm thông tin sinh viên
-    const student = await SinhVien.findOne({ MaDocGia: MaDocGia })
+    let student = await SinhVien.findOne({ MaDocGia: MaDocGia })
       .populate("MaLop", "TenLop")
       .populate({
         path: "MaNganhHoc",
@@ -39,6 +45,19 @@ async function getLibraryCard(MaDocGia) {
         },
       })
       .populate("MaNienKhoa", "TenNienKhoa");
+
+    let lecturer = null;
+    if (!student) {
+      // Nếu không phải sinh viên thì tìm giảng viên
+      lecturer = await GiangVien.findOne({ MaDocGia: MaDocGia }).populate({
+        path: "MaBoMon",
+        select: "TenBoMon MaKhoa",
+        populate: {
+          path: "MaKhoa",
+          select: "TenKhoa",
+        },
+      });
+    }
 
     // 3. Lấy toàn bộ lịch sử gia hạn của thẻ
     const history = await ThongTinGiaHan.find({ MaThe: card._id }).sort({
@@ -69,7 +88,7 @@ async function getLibraryCard(MaDocGia) {
 
     return {
       cardInfo: card || null,
-      studentInfo: student || null,
+      studentInfo: student || lecturer || null,
       extendHistory,
       reissueHistory: reissueList,
     };
@@ -102,12 +121,28 @@ async function createLibraryCard(DocGiaId) {
     const numberPart = match[0]; // VD: "0001"
     const MaThe = `LC${numberPart}`;
 
-    // 4. Xác định ngày cấp & ngày hết hạn (VD: 1 năm sau)
+    // 4. Lấy quy định thư viện hiện tại (chỉ nên có 1 bản ghi)
+    const rule = await QuyDinhThuVien.findOne();
+    if (!rule) {
+      throw new Error("Chưa thiết lập quy định thư viện trong hệ thống");
+    }
+
+    // 5. Xác định ngày cấp & ngày hết hạn dựa theo số ngày hiệu lực trong quy định
     const ngayCap = new Date();
     const ngayHetHan = new Date(ngayCap);
-    ngayHetHan.setFullYear(ngayCap.getFullYear() + 1);
 
-    // 5. Tạo thẻ
+    let soNgayHieuLuc;
+    if (docGia.DoiTuong === "Giảng viên") {
+      soNgayHieuLuc = rule.cardValidityDaysLecturer;
+    } else if (docGia.DoiTuong === "Sinh viên") {
+      soNgayHieuLuc = rule.cardValidityDays;
+    } else {
+      soNgayHieuLuc = 30;
+    }
+
+    ngayHetHan.setDate(ngayCap.getDate() + soNgayHieuLuc);
+
+    // 6. Tạo thẻ
     const newCard = await TheThuVien.create({
       MaThe,
       DocGia: docGia._id,
@@ -135,33 +170,44 @@ async function getAllInfoExpireCard() {
       })
       .sort({ NgayGiaHan: 1 });
 
-    // Gom nhóm theo thẻ
     const grouped = {};
     for (const item of info) {
       const card = item.MaThe;
       if (!card) continue;
 
       if (!grouped[card._id]) {
-        let student = null;
+        let additionalInfo = null;
+
         if (card.DocGia && card.DocGia._id) {
-          student = await SinhVien.findOne({ MaDocGia: card.DocGia._id })
-            .populate("MaLop", "TenLop")
-            .populate({
-              path: "MaNganhHoc",
-              select: "TenNganh Khoa",
-              populate: { path: "Khoa", select: "TenKhoa" },
+          if (card.DocGia.DoiTuong === "Sinh viên") {
+            additionalInfo = await SinhVien.findOne({
+              MaDocGia: card.DocGia._id,
             })
-            .populate("MaNienKhoa", "TenNienKhoa");
+              .populate("MaLop", "TenLop")
+              .populate({
+                path: "MaNganhHoc",
+                select: "TenNganh Khoa",
+                populate: { path: "Khoa", select: "TenKhoa" },
+              })
+              .populate("MaNienKhoa", "TenNienKhoa");
+          } else if (card.DocGia.DoiTuong === "Giảng viên") {
+            additionalInfo = await GiangVien.findOne({
+              MaDocGia: card.DocGia._id,
+            }).populate({
+              path: "MaBoMon",
+              select: "TenBoMon MaKhoa",
+              populate: { path: "MaKhoa", select: "TenKhoa" },
+            });
+          }
         }
 
         grouped[card._id] = {
           cardInfo: card,
-          studentInfo: student,
+          studentInfo: additionalInfo,
           extendHistory: [],
         };
       }
 
-      // Luôn thêm lịch sử (kể cả NgayGiaHan = null)
       grouped[card._id].extendHistory.push({
         NgayGiaHan: item.NgayGiaHan,
         PhiGiaHan: item.PhiGiaHan,
@@ -178,9 +224,26 @@ async function getAllInfoExpireCard() {
 async function renewLibraryCard(cardId) {
   try {
     const currentDate = new Date();
-    // Tính ngày hết hạn mới (gia hạn 1 năm)
+    // Lấy quy định hiện tại
+    const quyDinh = await QuyDinhThuVien.findOne({});
+    if (!quyDinh) throw new Error("Chưa có quy định thư viện");
+
+    // Lấy thông tin thẻ và độc giả
+    const card = await TheThuVien.findById(cardId).populate("DocGia");
+    if (!card || !card.DocGia)
+      throw new Error("Không tìm thấy thẻ hoặc độc giả");
+
+    // Xác định số ngày hiệu lực theo đối tượng
+    let validityDays;
+    if (card.DocGia.DoiTuong === "Giảng viên") {
+      validityDays = quyDinh.cardValidityDaysLecturer;
+    } else {
+      validityDays = quyDinh.cardValidityDays;
+    }
+
+    // Tính ngày hết hạn mới
     const newExpiryDate = new Date(currentDate);
-    newExpiryDate.setFullYear(newExpiryDate.getFullYear() + 1);
+    newExpiryDate.setDate(newExpiryDate.getDate() + validityDays);
 
     // Cập nhật thông tin thẻ thư viện
     const updatedCard = await TheThuVien.findByIdAndUpdate(
@@ -225,11 +288,26 @@ async function renewLibraryCard(cardId) {
 
 async function updateAvatar(studentId, imageUrl) {
   try {
-    const updated = await SinhVien.findByIdAndUpdate(
+    // 1️⃣ Thử cập nhật trong SinhVien trước
+    let updated = await SinhVien.findByIdAndUpdate(
       studentId,
       { Avatar: imageUrl },
       { new: true }
     );
+
+    // 2️⃣ Nếu không tìm thấy trong SinhVien thì thử trong GiangVien
+    if (!updated) {
+      updated = await GiangVien.findByIdAndUpdate(
+        studentId,
+        { Avatar: imageUrl },
+        { new: true }
+      );
+    }
+
+    // 3️⃣ Nếu vẫn không có thì báo lỗi
+    if (!updated) {
+      throw new Error("Không tìm thấy sinh viên hoặc giảng viên với ID này");
+    }
 
     return updated;
   } catch (err) {
@@ -241,10 +319,18 @@ async function updateAvatar(studentId, imageUrl) {
 async function requestCardReprint(MaThe) {
   try {
     const rule = await QuyDinhThuVien.findOne();
-    let reissueFee = 50000;
 
-    if (rule && rule.reissueFee) {
-      reissueFee = rule.reissueFee;
+    let reissueFee;
+    // Lấy thẻ và thông tin độc giả
+    const card = await TheThuVien.findById(MaThe).populate("DocGia");
+    if (!card || !card.DocGia)
+      throw new Error("Không tìm thấy thẻ hoặc độc giả");
+
+    // Xác định phí cấp lại theo đối tượng
+    if (card.DocGia.DoiTuong === "Giảng viên") {
+      reissueFee = rule ? rule.reissueFeeLecturer : 10000;
+    } else {
+      reissueFee = rule ? rule.reissueFee : 10000;
     }
 
     const request = await ThongTinCapLaiThe.create({
@@ -293,33 +379,45 @@ async function getAllInfoRenewCard() {
       })
       .sort({ NgayCapLai: -1 });
 
-    // Gom nhóm theo thẻ
     const grouped = {};
     for (const item of info) {
       const card = item.MaThe;
       if (!card) continue;
 
       if (!grouped[card._id]) {
-        let student = null;
+        let additionalInfo = null;
+
         if (card.DocGia && card.DocGia._id) {
-          student = await SinhVien.findOne({ MaDocGia: card.DocGia._id })
-            .populate("MaLop", "TenLop")
-            .populate({
-              path: "MaNganhHoc",
-              select: "TenNganh Khoa",
-              populate: { path: "Khoa", select: "TenKhoa" },
+          // Kiểm tra đối tượng là Sinh viên hay Giảng viên
+          if (card.DocGia.DoiTuong === "Sinh viên") {
+            additionalInfo = await SinhVien.findOne({
+              MaDocGia: card.DocGia._id,
             })
-            .populate("MaNienKhoa", "TenNienKhoa");
+              .populate("MaLop", "TenLop")
+              .populate({
+                path: "MaNganhHoc",
+                select: "TenNganh Khoa",
+                populate: { path: "Khoa", select: "TenKhoa" },
+              })
+              .populate("MaNienKhoa", "TenNienKhoa");
+          } else if (card.DocGia.DoiTuong === "Giảng viên") {
+            additionalInfo = await GiangVien.findOne({
+              MaDocGia: card.DocGia._id,
+            }).populate({
+              path: "MaBoMon",
+              select: "TenBoMon MaKhoa",
+              populate: { path: "MaKhoa", select: "TenKhoa" },
+            });
+          }
         }
 
         grouped[card._id] = {
           cardInfo: card,
-          studentInfo: student,
-          reissueHistory: [], // lịch sử cấp lại thẻ
+          studentInfo: additionalInfo, // Đổi tên này thành additionalInfo sẽ tốt hơn
+          reissueHistory: [],
         };
       }
 
-      // Luôn thêm lịch sử (kể cả NgayCapLai = null)
       grouped[card._id].reissueHistory.push({
         NgayYeuCau: item.NgayYeuCau,
         NgayDuyet: item.NgayDuyet,
@@ -415,10 +513,10 @@ async function denyReissueCard(maThe) {
         sort: { createdAt: -1 }, // lấy bản ghi mới nhất
       }
     ).populate({
-      path: 'MaThe',
+      path: "MaThe",
       populate: {
-        path: 'DocGia'
-      }
+        path: "DocGia",
+      },
     });
 
     if (!request) {
@@ -429,9 +527,9 @@ async function denyReissueCard(maThe) {
     if (request.MaThe && request.MaThe.DocGia) {
       await notificationService.createNotification({
         DocGia: request.MaThe.DocGia._id,
-        TieuDe: 'Yêu cầu làm lại thẻ bị từ chối',
+        TieuDe: "Yêu cầu làm lại thẻ bị từ chối",
         NoiDung: `Yêu cầu làm lại thẻ thư viện của bạn đã bị từ chối.`,
-        LoaiThongBao: 'error',
+        LoaiThongBao: "error",
       });
     }
 
@@ -475,6 +573,372 @@ async function updateCardRule(ruleUpdates) {
   }
 }
 
+async function getAllLibraryCards() {
+  try {
+    const cards = await TheThuVien.find()
+      .populate({
+        path: "DocGia",
+        select: "HoLot Ten MaDocGia NgaySinh Phai DiaChi DienThoai DoiTuong",
+      })
+      .sort({ createdAt: -1 });
+
+    const cardsWithDetails = await Promise.all(
+      cards.map(async (card) => {
+        const cardObj = card.toObject();
+
+        // Tìm trong sinh viên
+        let studentInfo = await SinhVien.findOne({ MaDocGia: card.DocGia._id })
+          .populate("MaLop", "TenLop")
+          .populate({
+            path: "MaNganhHoc",
+            select: "TenNganh Khoa",
+            populate: {
+              path: "Khoa",
+              select: "TenKhoa",
+            },
+          })
+          .populate("MaNienKhoa", "TenNienKhoa");
+
+        // Nếu không phải sinh viên thì tìm giảng viên
+        let lecturerInfo = null;
+        if (!studentInfo) {
+          lecturerInfo = await GiangVien.findOne({
+            MaDocGia: card.DocGia._id,
+          }).populate({
+            path: "MaBoMon",
+            select: "TenBoMon MaKhoa",
+            populate: {
+              path: "MaKhoa",
+              select: "TenKhoa",
+            },
+          });
+        }
+
+        // Lấy lịch sử gia hạn
+        const extendHistory = await ThongTinGiaHan.find({
+          MaThe: card._id,
+        }).sort({
+          NgayGiaHan: -1,
+        });
+
+        // Lấy lịch sử cấp lại thẻ
+        const reissueHistory = await ThongTinCapLaiThe.find({
+          MaThe: card._id,
+        }).sort({
+          NgayYeuCau: -1,
+        });
+
+        return {
+          ...cardObj,
+          additionalInfo: studentInfo || lecturerInfo || null,
+          extendHistory: extendHistory.map((item) => ({
+            NgayGiaHan: item.NgayGiaHan,
+            PhiGiaHan: item.PhiGiaHan,
+          })),
+          reissueHistory: reissueHistory.map((item) => ({
+            NgayYeuCau: item.NgayYeuCau,
+            NgayDuyet: item.NgayDuyet,
+            NgayCapLai: item.NgayCapLai,
+            PhiCapLai: item.PhiCapLai,
+            TrangThai: item.TrangThai,
+          })),
+        };
+      })
+    );
+
+    return cardsWithDetails;
+  } catch (error) {
+    console.error("Lỗi trong service getAllLibraryCards:", error);
+    throw error;
+  }
+}
+
+async function generateMaDocGia() {
+  const latestDocGia = await DocGia.findOne().sort({ createdAt: -1 }).exec();
+  let nextNumber = 1;
+
+  if (latestDocGia && latestDocGia.MaDocGia) {
+    const match = latestDocGia.MaDocGia.match(/DG(\d+)/);
+    if (match) {
+      nextNumber = parseInt(match[1], 10) + 1;
+    }
+  }
+
+  return nextNumber < 10000
+    ? `DG${nextNumber.toString().padStart(4, "0")}`
+    : `DG${nextNumber}`;
+}
+
+async function uploadLibraryCardsExcelForLecturers(file) {
+  try {
+    if (!file) {
+      throw new Error("Không có file được upload");
+    }
+
+    const workbook = XLSX.readFile(file.path);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    let created = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+
+      if (!row || row.length === 0 || !row[0]) continue;
+
+      try {
+        const [
+          MaCanBo,
+          HoLot,
+          Ten,
+          NgaySinh,
+          Phai,
+          DiaChi,
+          DienThoai,
+          EmailRow,
+          HocVi,
+          BoMonRow,
+          KhoaRow,
+        ] = row;
+
+        let NgaySinhProcess = null;
+        if (!isNaN(NgaySinh)) {
+          NgaySinhProcess = new Date((NgaySinh - 25569) * 86400 * 1000);
+        } else if (typeof NgaySinh === "string") {
+          NgaySinhProcess = new Date(NgaySinh);
+        }
+
+        const existingLecturer = await GiangVien.findOne({ MaCanBo });
+        if (existingLecturer) {
+          continue;
+        }
+
+        let khoaDoc = await Khoa.findOne({ TenKhoa: KhoaRow });
+        if (!khoaDoc) {
+          khoaDoc = await Khoa.create({ TenKhoa: KhoaRow });
+        }
+
+        let boMonDoc = await BoMon.findOne({
+          TenBoMon: BoMonRow,
+          MaKhoa: khoaDoc._id,
+        });
+        if (!boMonDoc) {
+          boMonDoc = await BoMon.create({
+            TenBoMon: BoMonRow,
+            MaKhoa: khoaDoc._id,
+          });
+        }
+
+        const maDocGia = await generateMaDocGia();
+        const docGia = await DocGia.create({
+          MaDocGia: maDocGia,
+          HoLot: HoLot,
+          Ten: Ten,
+          NgaySinh: NgaySinhProcess,
+          Phai: Phai,
+          DiaChi: DiaChi,
+          DienThoai: DienThoai,
+          Email: EmailRow, 
+          DoiTuong: "Giảng viên",
+        });
+
+        await GiangVien.create({
+          MaCanBo: MaCanBo,
+          Avatar: "",
+          HocVi: HocVi,
+          MaBoMon: boMonDoc._id,
+          MaDocGia: docGia._id,
+        });
+
+        const hashedPassword = await bcrypt.hash(MaCanBo, 10);
+        await TaiKhoan.create({
+          username: MaCanBo,
+          password: hashedPassword,
+          status: "active",
+          MaDocGia: docGia._id,
+        });
+
+        await createLibraryCard(docGia._id);
+        created++;
+      } catch (error) {
+        throw new Error(`Lỗi tại dòng ${i + 1}: ${error.message}`);
+      }
+    }
+
+    if (file.path && fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+
+    return { created };
+  } catch (error) {
+    console.error(
+      "Lỗi trong service uploadLibraryCardsExcelForLecturers:",
+      error
+    );
+
+    if (file && file.path && fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+
+    throw error;
+  }
+}
+
+async function uploadLibraryCardsExcelForStudents(file) {
+  try {
+    if (!file) {
+      throw new Error("Không có file được upload");
+    }
+
+    const workbook = XLSX.readFile(file.path);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    let created = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+
+      if (!row || row.length === 0 || !row[0]) continue;
+
+      try {
+        const [
+          MaSinhVienRow,
+          HoLotRow,
+          TenRow,
+          NgaySinhRow,
+          PhaiRow,
+          DiaChiRow,
+          DienThoaiRow,
+          EmailRow,
+          HeDaoTaoRow,
+          NienKhoaRow,
+          NamHocRow,
+          LopRow,
+          NganhHocRow,
+          KhoaRow
+        ] = row;
+
+        // console.log({
+        //   MaSinhVienRow,
+        //   HoLotRow,
+        //   TenRow,
+        //   NgaySinhRow,
+        //   PhaiRow,
+        //   DiaChiRow,
+        //   DienThoaiRow,
+        //   EmailRow,
+        //   HeDaoTaoRow,
+        //   NienKhoaRow,
+        //   NamHocRow,
+        //   LopRow,
+        //   NganhHocRow,
+        //   KhoaRow
+        // });
+
+        let NgaySinhProcess = null;
+        if (!isNaN(NgaySinhRow)) {
+          NgaySinhProcess = new Date((NgaySinhRow - 25569) * 86400 * 1000);
+        } else if (typeof NgaySinhRow === "string") {
+          NgaySinhProcess = new Date(NgaySinhRow);
+        }
+
+        const existingStudent = await SinhVien.findOne({ MaSinhVien: MaSinhVienRow });
+        if (existingStudent) {
+          continue;
+        }
+
+        const [NamBatDau, NamKetThuc] = NamHocRow.split("-").map(Number);
+
+        let nienKhoaDoc = await NienKhoa.findOne({ TenNienKhoa: NienKhoaRow });
+        if (!nienKhoaDoc) {
+          nienKhoaDoc = await NienKhoa.create({
+            TenNienKhoa: NienKhoaRow,
+            NamBatDau: NamBatDau,
+            NamKetThuc: NamKetThuc,
+          });
+        }
+
+        let khoaDoc = await Khoa.findOne({ TenKhoa: KhoaRow });
+        if (!khoaDoc) {
+          khoaDoc = await Khoa.create({ TenKhoa: KhoaRow });
+        }
+
+        let nganhHocDoc = await NganhHoc.findOne({
+          TenNganh: NganhHocRow,
+          Khoa: khoaDoc._id,
+        });
+        if (!nganhHocDoc) {
+          nganhHocDoc = await NganhHoc.create({
+            TenNganh: NganhHocRow,
+            Khoa: khoaDoc._id,
+          });
+        }
+
+        let lopDoc = await Lop.findOne({ TenLop: LopRow });
+        if (!lopDoc) {
+          lopDoc = await Lop.create({ TenLop: LopRow });
+        }
+
+        const maDocGia = await generateMaDocGia();
+        const docGia = await DocGia.create({
+          MaDocGia: maDocGia,
+          HoLot: HoLotRow,
+          Ten: TenRow,
+          NgaySinh: NgaySinhProcess,
+          Phai: PhaiRow,
+          DiaChi: DiaChiRow,
+          DienThoai: DienThoaiRow,
+          Email: EmailRow || '',
+          DoiTuong: "Sinh viên",
+        });
+
+        await SinhVien.create({
+          MaSinhVien: MaSinhVienRow,
+          Avatar: "",
+          HeDaoTao: HeDaoTaoRow,
+          MaNienKhoa: nienKhoaDoc._id,
+          MaNganhHoc: nganhHocDoc._id,
+          MaDocGia: docGia._id,
+          MaLop: lopDoc._id,
+        });
+
+        const hashedPassword = await bcrypt.hash(MaSinhVienRow, 10);
+        await TaiKhoan.create({
+          username: MaSinhVienRow,
+          password: hashedPassword,
+          status: "active",
+          MaDocGia: docGia._id,
+        });
+
+        await createLibraryCard(docGia._id);
+        created++;
+      } catch (error) {
+        throw new Error(`Lỗi tại dòng ${i + 1}: ${error.message}`);
+      }
+    }
+
+    if (file.path && fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+
+    return { created };
+  } catch (error) {
+    console.error(
+      "Lỗi trong service uploadLibraryCardsExcelForStudents:",
+      error
+    );
+
+    if (file && file.path && fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+
+    throw error;
+  }
+}
+
 module.exports = {
   getLibraryCard,
   createLibraryCard,
@@ -489,4 +953,7 @@ module.exports = {
   denyReissueCard,
   getCardRule,
   updateCardRule,
+  getAllLibraryCards,
+  uploadLibraryCardsExcelForLecturers,
+  uploadLibraryCardsExcelForStudents
 };

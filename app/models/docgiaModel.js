@@ -35,6 +35,12 @@ const DocGiaSchema = new mongoose.Schema({
     required: true,
     match: /^[0-9]{9,11}$/
   },
+  Email: {
+    type: String,
+    required: false,
+    trim: true,
+    match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  },
   DoiTuong: {
     type: String,
     enum: ['Sinh viên', 'Giảng viên', 'Khách'],
@@ -49,6 +55,13 @@ DocGiaSchema.virtual("SinhVien", {
   localField: "_id",   // _id của DocGia
   foreignField: "MaDocGia", // trỏ tới field MaDocGia trong SinhVien
   justOne: true,       // vì 1 DocGia chỉ có 1 SinhVien
+});
+
+DocGiaSchema.virtual("GiangVien", {
+  ref: "GiangVien",
+  localField: "_id",
+  foreignField: "MaDocGia",
+  justOne: true,
 });
 
 module.exports = mongoose.model('DocGia', DocGiaSchema);

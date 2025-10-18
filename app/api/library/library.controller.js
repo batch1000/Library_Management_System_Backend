@@ -102,7 +102,7 @@ async function getAllInfoRenewCard(req, res) {
 
 async function approveReissueCard(req, res) {
   try {
-    const { cardId } = req.body; 
+    const { cardId } = req.body;
     const result = await libraryService.approveReissueCard(cardId);
     res.json(result);
   } catch (error) {
@@ -146,20 +146,80 @@ async function getCardRule(req, res) {
 
 async function updateCardRule(req, res) {
   try {
-    const { renewalFee, reissueFee, printWaitingDays, cardValidityDays } = req.body;
+    const {
+      renewalFee,
+      reissueFee,
+      printWaitingDays,
+      cardValidityDays,
+      renewalFeeLecturer,
+      reissueFeeLecturer,
+      printWaitingDaysLecturer,
+      cardValidityDaysLecturer,
+    } = req.body;
 
     // gọi service để update
     const updatedRule = await libraryService.updateCardRule({
       renewalFee,
       reissueFee,
       printWaitingDays,
-      cardValidityDays
+      cardValidityDays,
+      renewalFeeLecturer,
+      reissueFeeLecturer,
+      printWaitingDaysLecturer,
+      cardValidityDaysLecturer,
     });
 
     res.status(200).json(updatedRule);
   } catch (error) {
     console.error("❌ Lỗi khi cập nhật quy định thẻ thư viện:", error);
-    res.status(500).json({ message: "Lỗi server khi cập nhật quy định thẻ thư viện" });
+    res
+      .status(500)
+      .json({ message: "Lỗi server khi cập nhật quy định thẻ thư viện" });
+  }
+}
+
+async function getAllLibraryCards(req, res) {
+  try {
+    const allCards = await libraryService.getAllLibraryCards();
+    // console.log(JSON.stringify(allCards[1], null, 2));
+    // console.log(JSON.stringify(allCards[3], null, 2));
+    res.json(allCards);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách tất cả thẻ thư viện:", error);
+    res.status(500).json({
+      message: "Lấy danh sách thẻ thư viện thất bại",
+      error: error.message,
+    });
+  }
+}
+
+async function uploadLibraryCardsExcelForLecturers(req, res) {
+  try {
+    const result = await libraryService.uploadLibraryCardsExcelForLecturers(
+      req.file
+    );
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi upload file Excel giảng viên:", error);
+    res.status(500).json({
+      message: "Upload file thất bại",
+      error: error.message,
+    });
+  }
+}
+
+async function uploadLibraryCardsExcelForStudents(req, res) {
+  try {
+    const result = await libraryService.uploadLibraryCardsExcelForStudents(
+      req.file
+    );
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi upload file Excel sinh viên:", error);
+    res.status(500).json({
+      message: "Upload file thất bại",
+      error: error.message,
+    });
   }
 }
 
@@ -175,5 +235,8 @@ module.exports = {
   printCard,
   denyReissueCard,
   getCardRule,
-  updateCardRule
+  updateCardRule,
+  getAllLibraryCards,
+  uploadLibraryCardsExcelForLecturers,
+  uploadLibraryCardsExcelForStudents
 };
