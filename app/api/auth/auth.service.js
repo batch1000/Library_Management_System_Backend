@@ -68,6 +68,7 @@ async function login(data) {
     return {
       _id: user.MaDocGia._id,
       role: "User",
+      userType: user.MaDocGia.DoiTuong,
       hoTen: `${user.MaDocGia.HoLot} ${user.MaDocGia.Ten}`,
       cardStatus: card.TrangThai || null,
     };

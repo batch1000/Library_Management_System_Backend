@@ -202,18 +202,28 @@ function normalizeDate(date) {
 (async () => {
   try {
     const quyDinh = await QuyDinhMuonSach.findOne({});
-    const pickupDeadlineDays = (quyDinh && quyDinh.pickupDeadline) || 3;
-
     // Lấy tất cả yêu cầu đang ở trạng thái processing
     const processingRequests = await TheoDoiMuonSach.find({
       TrangThai: "processing",
       NgayDuyet: { $ne: null },
-    }).populate("MaSach", "TenSach");
+    })
+      .populate("MaSach", "TenSach")
+      .populate("MaDocGia", "DoiTuong");
 
     const today = normalizeDate(new Date());
     let hasLate = false;
 
     for (const request of processingRequests) {
+      const doiTuong = request.MaDocGia.DoiTuong;
+      const pickupDeadlineDays =
+        doiTuong === "Giảng viên"
+          ? quyDinh
+            ? quyDinh.pickupDeadlineLecturer
+            : 0
+          : quyDinh
+          ? quyDinh.pickupDeadline
+          : 0;
+
       const ngayDuyet = normalizeDate(request.NgayDuyet);
 
       const diffTime = today.getTime() - ngayDuyet.getTime();

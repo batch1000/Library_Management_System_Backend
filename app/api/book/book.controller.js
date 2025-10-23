@@ -106,7 +106,6 @@ async function addFaculty(req, res) {
   }
 }
 
-
 async function getAllBook(req, res) {
   try {
     const books = await bookService.getAllBook();
@@ -332,8 +331,8 @@ async function addTextBook(req, res) {
       PdfFile: pdfUrl,
       TenNXB: body.publisher,
       DiaChiNXB: body.publisherAddress,
-      LoaiSach: "GiaoTrinh",      
-      TenKhoa: body.faculty          
+      LoaiSach: "GiaoTrinh",
+      TenKhoa: body.faculty,
     };
 
     const result = await bookService.addTextBook(textBookData);
@@ -554,21 +553,36 @@ async function updateOverdueFee(req, res) {
 
 async function extendBorrowTime(req, res) {
   try {
-    const { requestId, adminId, newDueDate } = req.body;
+    const { requestId, adminId} = req.body;
 
-    if (!requestId || !adminId || !newDueDate) {
+    if (!requestId || !adminId) {
       return res.status(400).send("Thiếu thông tin cần thiết");
     }
 
     const updated = await bookService.extendBorrowTime(
       requestId,
-      adminId,
-      newDueDate
+      adminId
     );
     res.json(updated);
   } catch (error) {
     console.error("Lỗi khi gia hạn mượn sách:", error);
     res.status(500).send("Gia hạn mượn sách thất bại");
+  }
+}
+
+async function checkIfExtendBorrowTime(req, res) {
+  try {
+    const { requestId } = req.body;
+
+    if (!requestId) {
+      return res.status(400).send("Thiếu thông tin requestId");
+    }
+
+    const result = await bookService.checkIfExtendBorrowTime(requestId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi kiểm tra gia hạn:", error);
+    res.status(500).send("Kiểm tra gia hạn thất bại");
   }
 }
 
@@ -973,7 +987,16 @@ async function getBookPenaltyRule(req, res) {
 
 async function updateBookPenaltyRule(req, res) {
   try {
-    const { coefLost, feeManage, coefDamageLight, feeLate } = req.body;
+    const {
+      coefLost,
+      feeManage,
+      coefDamageLight,
+      feeLate,
+      coefLostLecturer,
+      feeManageLecturer,
+      coefDamageLightLecturer,
+      feeLateLecturer,
+    } = req.body;
 
     // gọi service để update
     const updatedRule = await bookService.updateBookPenaltyRule({
@@ -981,6 +1004,10 @@ async function updateBookPenaltyRule(req, res) {
       feeManage,
       coefDamageLight,
       feeLate,
+      coefLostLecturer,
+      feeManageLecturer,
+      coefDamageLightLecturer,
+      feeLateLecturer,
     });
 
     res.status(200).json(updatedRule);
@@ -1008,6 +1035,11 @@ async function updateBookBorrowRule(req, res) {
       borrowDuration,
       pickupDeadline,
       renewalDuration,
+      maxBooksLecturer,
+      maxBooksPerDayLecturer,
+      borrowDurationLecturer,
+      pickupDeadlineLecturer,
+      renewalDurationLecturer
     } = req.body;
 
     // gọi service để update
@@ -1017,6 +1049,11 @@ async function updateBookBorrowRule(req, res) {
       borrowDuration,
       pickupDeadline,
       renewalDuration,
+      maxBooksLecturer,
+      maxBooksPerDayLecturer,
+      borrowDurationLecturer,
+      pickupDeadlineLecturer,
+      renewalDurationLecturer
     });
 
     res.status(200).json(updatedRule);
@@ -1139,6 +1176,36 @@ async function rejectThesis(req, res) {
   }
 }
 
+async function updatePenaltyFee(req, res) {
+  try {
+    const { requestId, adminId, newTotalFee, reason } = req.body;
+
+    if (!requestId || !adminId || newTotalFee === undefined || !reason) {
+      return res.status(400).send("Thiếu thông tin cần thiết");
+    }
+
+    if (newTotalFee < 0) {
+      return res.status(400).send("Tổng phí không hợp lệ");
+    }
+
+    if (!reason.trim()) {
+      return res.status(400).send("Vui lòng nhập lý do điều chỉnh");
+    }
+
+    const updated = await bookService.updatePenaltyFee(
+      requestId,
+      adminId,
+      newTotalFee,
+      reason
+    );
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Lỗi khi cập nhật tổng phí phạt:", error);
+    res.status(500).send(error.message || "Cập nhật tổng phí phạt thất bại");
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -1153,6 +1220,7 @@ module.exports = {
   getTrackBorrowBook,
   updateBorrowStatus,
   extendBorrowTime,
+  checkIfExtendBorrowTime,
   getBorrowBookOfUser,
   addFavoriteBook,
   getFavoriteBooks,
@@ -1192,5 +1260,6 @@ module.exports = {
   updateTextBook,
   getOneTextBook,
   getAllFaculty,
-  addFaculty
+  addFaculty,
+  updatePenaltyFee
 };

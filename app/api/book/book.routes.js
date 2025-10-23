@@ -14,6 +14,7 @@ const {
   getTrackBorrowBook,
   updateBorrowStatus,
   extendBorrowTime,
+  checkIfExtendBorrowTime,
   getBorrowBookOfUser,
   addFavoriteBook,
   getFavoriteBooks,
@@ -53,7 +54,8 @@ const {
   updateTextBook,
   getOneTextBook,
   getAllFaculty,
-  addFaculty
+  addFaculty,
+  updatePenaltyFee
 } = require("./book.controller");
 
 const router = express.Router();
@@ -112,6 +114,7 @@ router.post("/confirmPaidCompensation", confirmPaidCompensation);
 router.post("/confirmRepaired", confirmRepaired);
 router.post("/updateOverdueFee", updateOverdueFee);
 router.post("/extendBorrowTime", extendBorrowTime);
+router.post("/checkIfExtendBorrowTime", checkIfExtendBorrowTime);
 router.post("/countCurrentBorrowing", countCurrentBorrowing);
 router.post("/countCurrentBorrowingToday", countCurrentBorrowingToday);
 router.post("/countCurrentPending", countCurrentPending);
@@ -155,5 +158,7 @@ router.post("/getOneThesis", getOneThesis);
 router.get("/getAllThesis", getAllThesis);
 router.post("/approveThesis", approveThesis);
 router.post("/rejectThesis", rejectThesis);
+
+router.post("/updatePenaltyFee", updatePenaltyFee);
 
 module.exports = router;

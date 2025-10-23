@@ -16,7 +16,6 @@ const Khoa = require("../../models/khoaModel");
 
 const notificationService = require("../notification/notification.service");
 
-
 const {
   deleteImageFromCloudinary,
 } = require("../../services/cloudinary.service");
@@ -519,8 +518,23 @@ async function updateBorrowStatus(requestId, adminId, status) {
         const now = new Date();
         updateFields.NgayMuon = now;
 
+        // Lấy quy định
         const quyDinh = await QuyDinhMuonSach.findOne({});
-        const duration = (quyDinh && quyDinh.borrowDuration) || 7;
+
+        // Lấy thông tin độc giả để xác định đối tượng
+        const docGia = await DocGia.findById(currentRequest.MaDocGia);
+        if (!docGia) {
+          throw new Error("Không tìm thấy độc giả");
+        }
+
+        // Xác định hạn mượn theo đối tượng
+        let duration;
+        if (docGia.DoiTuong === "Giảng viên") {
+          duration = (quyDinh && quyDinh.borrowDurationLecturer) || 1;
+        } else {
+          // Mặc định: Sinh viên hoặc khách
+          duration = (quyDinh && quyDinh.borrowDuration) || 1;
+        }
 
         updateFields.NgayTra = new Date(
           now.getTime() + duration * 24 * 60 * 60 * 1000
@@ -591,7 +605,10 @@ async function updateOverdueFee(requestId) {
 
 async function updateReturnStatus(requestId, adminId, status, bookCondition) {
   try {
-    const request = await TheoDoiMuonSach.findById(requestId);
+    const request = await TheoDoiMuonSach.findById(requestId).populate(
+      "MaDocGia",
+      "DoiTuong"
+    );
     if (!request) throw new Error("Không tìm thấy yêu cầu mượn");
 
     const sach = await Sach.findById(request.MaSach);
@@ -603,13 +620,33 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
       .sort({ updatedAt: -1 })
       .exec();
 
-    // Nếu không có quy định thì dùng mặc định
-    const rules = penaltyRules || {
-      coefLost: 1.3,
-      feeManage: 50000,
-      coefDamageLight: 20,
-      feeLate: 5000,
-    };
+    // ✅ XÁC ĐỊNH LOẠI ĐỘC GIẢ
+    const doiTuong = request.MaDocGia ? request.MaDocGia.DoiTuong : null;
+    const isLecturer = doiTuong === "Giảng viên";
+
+    // ✅ CHỌN QUY ĐỊNH PHẠT DỰA VÀO LOẠI ĐỘC GIẢ
+    const rules = penaltyRules
+      ? {
+          coefLost: isLecturer
+            ? penaltyRules.coefLostLecturer
+            : penaltyRules.coefLost,
+          feeManage: isLecturer
+            ? penaltyRules.feeManageLecturer
+            : penaltyRules.feeManage,
+          coefDamageLight: isLecturer
+            ? penaltyRules.coefDamageLightLecturer
+            : penaltyRules.coefDamageLight,
+          feeLate: isLecturer
+            ? penaltyRules.feeLateLecturer
+            : penaltyRules.feeLate,
+        }
+      : {
+          // Nếu không có quy định thì dùng mặc định cho sinh viên
+          coefLost: 1.3,
+          feeManage: 50000,
+          coefDamageLight: 20,
+          feeLate: 5000,
+        };
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -737,9 +774,12 @@ async function confirmRepaired(requestId) {
   }
 }
 
-async function extendBorrowTime(requestId, adminId, newDueDate) {
+async function extendBorrowTime(requestId, adminId) {
   try {
-    const request = await TheoDoiMuonSach.findById(requestId);
+    const request = await TheoDoiMuonSach.findById(requestId).populate(
+      "MaDocGia",
+      "DoiTuong"
+    );
 
     if (!request) {
       throw new Error("Không tìm thấy yêu cầu mượn sách");
@@ -757,11 +797,22 @@ async function extendBorrowTime(requestId, adminId, newDueDate) {
       throw new Error("Yêu cầu này đã được gia hạn trước đó");
     }
 
-    const newDate = new Date(newDueDate);
+    // Lấy quy định gia hạn dựa vào DoiTuong
+    const quyDinh = await QuyDinhMuonSach.findOne({});
+    const doiTuong = request.MaDocGia ? request.MaDocGia.DoiTuong : null;
 
-    if (newDate <= request.NgayTra) {
-      throw new Error("Ngày gia hạn phải sau ngày trả hiện tại");
-    }
+    const soNgayGiaHan =
+      doiTuong === "Giảng viên"
+        ? quyDinh
+          ? quyDinh.renewalDurationLecturer
+          : 5
+        : quyDinh
+        ? quyDinh.renewalDuration
+        : 3;
+
+    // Tính ngày trả mới
+    const newDate = new Date(request.NgayTra);
+    newDate.setDate(newDate.getDate() + soNgayGiaHan);
 
     // Cập nhật
     request.NgayTra = newDate;
@@ -772,6 +823,23 @@ async function extendBorrowTime(requestId, adminId, newDueDate) {
     return updated;
   } catch (err) {
     console.error("Lỗi khi gia hạn mượn sách:", err);
+    throw err;
+  }
+}
+
+async function checkIfExtendBorrowTime(requestId) {
+  try {
+    const request = await TheoDoiMuonSach.findById(requestId);
+
+    if (!request) {
+      throw new Error("Không tìm thấy yêu cầu mượn sách");
+    }
+
+    return {
+      DaGiaHan: request.DaGiaHan || false,
+    };
+  } catch (err) {
+    console.error("Lỗi khi kiểm tra gia hạn:", err);
     throw err;
   }
 }
@@ -1959,7 +2027,7 @@ async function approveThesis(thesisId) {
       thesisId,
       { TrangThai: "Đã duyệt", NgayNop: new Date() },
       { new: true }
-    ).populate('MaDocGia'); // ✅ THÊM populate để lấy thông tin DocGia
+    ).populate("MaDocGia"); // ✅ THÊM populate để lấy thông tin DocGia
 
     if (!thesis) {
       throw new Error("Không tìm thấy luận văn");
@@ -1969,9 +2037,9 @@ async function approveThesis(thesisId) {
     if (thesis.MaDocGia) {
       await notificationService.createNotification({
         DocGia: thesis.MaDocGia._id,
-        TieuDe: 'Luận văn được duyệt',
+        TieuDe: "Luận văn được duyệt",
         NoiDung: `Luận văn "${thesis.TieuDeTai}" của bạn đã được phê duyệt và đưa vào thư viện.`,
-        LoaiThongBao: 'success',
+        LoaiThongBao: "success",
       });
     }
 
@@ -1987,7 +2055,7 @@ async function rejectThesis(thesisId) {
       thesisId,
       { TrangThai: "Từ chối" },
       { new: true }
-    ).populate('MaDocGia'); // ✅ THÊM populate để lấy thông tin DocGia
+    ).populate("MaDocGia"); // ✅ THÊM populate để lấy thông tin DocGia
 
     if (!thesis) {
       throw new Error("Không tìm thấy luận văn");
@@ -1997,14 +2065,51 @@ async function rejectThesis(thesisId) {
     if (thesis.MaDocGia) {
       await notificationService.createNotification({
         DocGia: thesis.MaDocGia._id,
-        TieuDe: 'Luận văn bị từ chối',
+        TieuDe: "Luận văn bị từ chối",
         NoiDung: `Luận văn "${thesis.TieuDeTai}" của bạn đã bị từ chối. Vui lòng liên hệ thư viện để biết thêm chi tiết.`,
-        LoaiThongBao: 'error',
+        LoaiThongBao: "error",
       });
     }
 
     return thesis;
   } catch (err) {
+    throw err;
+  }
+}
+
+async function updatePenaltyFee(requestId, adminId, newTotalFee, reason) {
+  try {
+    const request = await TheoDoiMuonSach.findById(requestId);
+    if (!request) {
+      throw new Error("Không tìm thấy yêu cầu mượn");
+    }
+
+    // Kiểm tra đã thanh toán chưa
+    if (request.DaThanhToan) {
+      throw new Error("Không thể sửa phí sau khi đã thanh toán");
+    }
+
+    // Kiểm tra phải có phí mới được sửa
+    if (request.PhiBoiThuong === 0 && request.PhiQuaHan === 0) {
+      throw new Error("Không có phí để điều chỉnh");
+    }
+
+    // Cập nhật thông tin
+    const updateFields = {
+      TongPhiDaSua: newTotalFee,
+      LyDoSua: reason.trim(),
+      Msnv: adminId
+    };
+
+    const updated = await TheoDoiMuonSach.findByIdAndUpdate(
+      requestId,
+      updateFields,
+      { new: true }
+    ).populate('MaDocGia MaSach');
+
+    return updated;
+  } catch (err) {
+    console.error("Lỗi khi cập nhật tổng phí phạt:", err);
     throw err;
   }
 }
@@ -2023,6 +2128,7 @@ module.exports = {
   getTrackBorrowBook,
   updateBorrowStatus,
   extendBorrowTime,
+  checkIfExtendBorrowTime,
   getBorrowBookOfUser,
   addFavoriteBook,
   getFavoriteBooks,
@@ -2061,5 +2167,6 @@ module.exports = {
   updateTextBook,
   getOneTextBook,
   getAllFaculty,
-  addFaculty
+  addFaculty,
+  updatePenaltyFee
 };

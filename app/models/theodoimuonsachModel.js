@@ -68,6 +68,16 @@ const TheoDoiMuonSachSchema = new mongoose.Schema({
     default: 0
   },
 
+  TongPhiDaSua: {
+    type: Number,
+    default: null
+  },
+  
+  LyDoSua: {
+    type: String,
+    default: null
+  },
+
   NgayGhiNhanQuaHan: {
     type: Date,
     default: null
@@ -105,7 +115,7 @@ const TheoDoiMuonSachSchema = new mongoose.Schema({
     ref: 'NhanVien',
     required: false,
     default: null
-  }
+  },
 }, {
   timestamps: true
 });
