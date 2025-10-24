@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 const PhongHoc = require("../../models/phonghocModel");
 const ViTriPhong = require("../../models/vitriphongModel");
-const KhungGio = require("../../models/khunggioModel");
 const TheoDoiDatPhong = require("../../models/theodoimuonphongModel");
 const QuyDinhPhongHoc = require("../../models/quydinhphonghocModel");
 const DocGia = require("../../models/docgiaModel");
@@ -34,58 +33,63 @@ async function generateMaPhong() {
 }
 
 async function addRoom(roomData) {
-  if (!roomData.TenPhong || !roomData.LoaiPhong || !roomData.SucChua) {
+  if (!roomData.TenPhong || !roomData.LoaiPhong || !roomData.SucChua || !roomData.TienIch) {
     throw new Error("Thiếu thông tin để thêm phòng học.");
-  }
-
-  // THÊM MỚI - Validate KhungGio
-  if (
-    !roomData.KhungGio ||
-    !Array.isArray(roomData.KhungGio) ||
-    roomData.KhungGio.length === 0
-  ) {
-    throw new Error("Phòng học phải có ít nhất một khung giờ.");
   }
 
   const maPhong = await generateMaPhong();
 
   let viTriId = null;
   if (roomData.ViTri) {
-    // Tìm vị trí đã tồn tại chưa
     let viTriDoc = await ViTriPhong.findOne({ ViTri: roomData.ViTri.trim() });
-
     if (!viTriDoc) {
-      // Nếu chưa có thì tạo mới
       viTriDoc = new ViTriPhong({ ViTri: roomData.ViTri.trim() });
       viTriDoc = await viTriDoc.save();
     }
-
     viTriId = viTriDoc._id;
   }
 
-  // Tạo phòng học
+  // SỬA - Tạo danh sách chỗ ngồi theo logic đúng
+  const choNgoi = [];
+  if (roomData.SucChua > 0) {
+    const soCho = roomData.SucChua;
+    
+    // SỬA - Tính số cột và số hàng đúng
+    // Ưu tiên chia đều theo hàng ngang
+    const soCot = Math.ceil(Math.sqrt(soCho * 1.5)); // Tăng tỷ lệ ngang
+    const soHang = Math.ceil(soCho / soCot);
+    
+    let soChoHienTai = 1;
+    for (let hang = 0; hang < soHang; hang++) {
+      for (let cot = 0; cot < soCot; cot++) {
+        if (soChoHienTai > soCho) break;
+        
+        const hangChu = String.fromCharCode(65 + hang); // A, B, C...
+        const tenCho = `${hangChu}${cot + 1}`;
+        
+        choNgoi.push({
+          SoCho: soChoHienTai,
+          HangDoc: hang + 1,      // Hàng dọc (A=1, B=2...)
+          HangNgang: cot + 1,     // Cột ngang (1, 2, 3...)
+          TenCho: tenCho
+        });
+        
+        soChoHienTai++;
+      }
+    }
+  }
+
   const newRoom = new PhongHoc({
     MaPhong: maPhong,
     TenPhong: roomData.TenPhong,
     LoaiPhong: roomData.LoaiPhong,
     SucChua: roomData.SucChua,
     ViTri: viTriId,
+    TienIch: roomData.TienIch,
+    ChoNgoi: choNgoi
   });
 
   const savedRoom = await newRoom.save();
-
-  // THÊM MỚI - Tạo các khung giờ cho phòng
-  const khungGioPromises = roomData.KhungGio.map((slot) => {
-    const khungGio = new KhungGio({
-      PhongHoc: savedRoom._id,
-      GioBatDau: slot.GioBatDau,
-      GioKetThuc: slot.GioKetThuc,
-    });
-    return khungGio.save();
-  });
-
-  await Promise.all(khungGioPromises);
-
   return savedRoom;
 }
 
@@ -93,29 +97,7 @@ async function getAllRoom() {
   try {
     // Lấy tất cả phòng học kèm vị trí
     const rooms = await PhongHoc.find().populate("ViTri").lean();
-
-    // Lấy danh sách khung giờ theo từng phòng
-    const roomIds = rooms.map((r) => r._id);
-    const allTimeSlots = await KhungGio.find({
-      PhongHoc: { $in: roomIds },
-    }).lean();
-
-    // Gắn khung giờ vào từng phòng
-    const roomsWithSlots = rooms.map((room) => {
-      const slots = allTimeSlots.filter(
-        (slot) => String(slot.PhongHoc) === String(room._id)
-      );
-      return {
-        ...room,
-        KhungGio: slots.map((s) => ({
-          GioBatDau: s.GioBatDau,
-          GioKetThuc: s.GioKetThuc,
-          _id: s._id,
-        })),
-      };
-    });
-
-    return roomsWithSlots;
+    return rooms;
   } catch (err) {
     console.error("Lỗi khi lấy danh sách phòng:", err);
     throw err;
@@ -127,63 +109,68 @@ async function updateRoom(roomData) {
     !roomData._id ||
     !roomData.TenPhong ||
     !roomData.LoaiPhong ||
-    !roomData.SucChua
+    !roomData.SucChua ||
+    !roomData.TienIch
   ) {
     throw new Error("Thiếu thông tin để cập nhật phòng học.");
   }
 
-  // THÊM MỚI - Validate KhungGio
-  if (
-    !roomData.KhungGio ||
-    !Array.isArray(roomData.KhungGio) ||
-    roomData.KhungGio.length === 0
-  ) {
-    throw new Error("Phòng học phải có ít nhất một khung giờ.");
-  }
-
   let viTriId = null;
   if (roomData.ViTri) {
-    // Tìm vị trí đã tồn tại chưa
     let viTriDoc = await ViTriPhong.findOne({ ViTri: roomData.ViTri.trim() });
-
     if (!viTriDoc) {
-      // Nếu chưa có thì tạo mới
       viTriDoc = new ViTriPhong({ ViTri: roomData.ViTri.trim() });
       viTriDoc = await viTriDoc.save();
     }
-
     viTriId = viTriDoc._id;
   }
 
-  // Tạo object cập nhật
+  const oldRoom = await PhongHoc.findById(roomData._id);
+  
+  // SỬA - Nếu sức chứa thay đổi, tạo lại danh sách chỗ ngồi
+  let choNgoi = oldRoom.ChoNgoi || [];
+  if (oldRoom.SucChua !== roomData.SucChua) {
+    choNgoi = [];
+    const soCho = roomData.SucChua;
+    
+    // SỬA - Logic tính toán giống addRoom
+    const soCot = Math.ceil(Math.sqrt(soCho * 1.5));
+    const soHang = Math.ceil(soCho / soCot);
+    
+    let soChoHienTai = 1;
+    for (let hang = 0; hang < soHang; hang++) {
+      for (let cot = 0; cot < soCot; cot++) {
+        if (soChoHienTai > soCho) break;
+        
+        const hangChu = String.fromCharCode(65 + hang);
+        const tenCho = `${hangChu}${cot + 1}`;
+        
+        choNgoi.push({
+          SoCho: soChoHienTai,
+          HangDoc: hang + 1,
+          HangNgang: cot + 1,
+          TenCho: tenCho
+        });
+        
+        soChoHienTai++;
+      }
+    }
+  }
+
   const updateData = {
     TenPhong: roomData.TenPhong,
     LoaiPhong: roomData.LoaiPhong,
     SucChua: roomData.SucChua,
     ViTri: viTriId,
+    TienIch: roomData.TienIch,
+    ChoNgoi: choNgoi
   };
 
   const updatedRoom = await PhongHoc.findByIdAndUpdate(
     roomData._id,
     updateData,
-    { new: true } // trả về document sau khi cập nhật
+    { new: true }
   );
-
-  // THÊM MỚI - Xóa tất cả khung giờ cũ của phòng này
-  await KhungGio.deleteMany({ PhongHoc: roomData._id });
-
-  // THÊM MỚI - Tạo lại các khung giờ mới
-  const khungGioPromises = roomData.KhungGio.map((slot) => {
-    const khungGio = new KhungGio({
-      PhongHoc: roomData._id,
-      GioBatDau: slot.GioBatDau,
-      GioKetThuc: slot.GioKetThuc,
-    });
-    return khungGio.save();
-  });
-
-  await Promise.all(khungGioPromises);
-  // HẾT PHẦN THÊM MỚI
 
   return updatedRoom;
 }
@@ -193,10 +180,29 @@ async function deleteRoom(roomId) {
     throw new Error("Thiếu thông tin _id để xóa phòng học.");
   }
 
-  // Xóa phòng theo _id
+  const room = await PhongHoc.findById(roomId);
+  if (!room) {
+    throw new Error("Không tìm thấy phòng học để xóa.");
+  }
+
+  // Xóa TẤT CẢ booking (kể cả active) - CẢNH BÁO: Có thể ảnh hưởng người dùng
+  await TheoDoiDatPhong.deleteMany({ PhongHoc: roomId });
+
+  // Xóa phòng
   const deletedRoom = await PhongHoc.findByIdAndDelete(roomId);
 
-  return deletedRoom; // nếu null thì controller sẽ xử lý trả 404
+  // Xóa vị trí nếu không còn dùng
+  if (deletedRoom.ViTri) {
+    const roomsUsingLocation = await PhongHoc.countDocuments({ 
+      ViTri: deletedRoom.ViTri 
+    });
+    
+    if (roomsUsingLocation === 0) {
+      await ViTriPhong.findByIdAndDelete(deletedRoom.ViTri);
+    }
+  }
+
+  return deletedRoom;
 }
 
 async function getAllBookRoomByUserId(userId) {
@@ -243,6 +249,7 @@ async function getAllBookRoomByUserId(userId) {
         GioBatDau: b.GioBatDau,
         GioKetThuc: b.GioKetThuc,
         TrangThai: b.TrangThai,
+        ChoNgoiDaChon: b.ChoNgoiDaChon || [],
         PhongHoc: b.PhongHoc
           ? {
               _id: b.PhongHoc._id,
@@ -251,6 +258,8 @@ async function getAllBookRoomByUserId(userId) {
               LoaiPhong: b.PhongHoc.LoaiPhong,
               SucChua: b.PhongHoc.SucChua,
               ViTri: b.PhongHoc.ViTri,
+              TienIch: b.PhongHoc.TienIch || 'Chưa có thông tin',
+              ChoNgoi: b.PhongHoc.ChoNgoi || [],
             }
           : null,
         ThanhVien: thanhVienList,
@@ -263,16 +272,71 @@ async function getAllBookRoomByUserId(userId) {
 }
 
 async function createBooking(bookingData) {
+  // THÊM - Validate chỗ ngồi
+  if (!bookingData.ChoNgoiDaChon || bookingData.ChoNgoiDaChon.length === 0) {
+    throw new Error("Vui lòng chọn chỗ ngồi");
+  }
+
+  // THÊM - Validate số lượng chỗ với số người
+  const soNguoi = 1 + (bookingData.ThanhVien ? bookingData.ThanhVien.length : 0);
+  if (bookingData.ChoNgoiDaChon.length !== soNguoi) {
+    throw new Error(`Số chỗ chọn (${bookingData.ChoNgoiDaChon.length}) phải bằng số người (${soNguoi})`);
+  }
+
+  // THÊM - Kiểm tra chỗ ngồi có tồn tại trong phòng không
+  const room = await PhongHoc.findById(bookingData.PhongHoc);
+  if (!room) {
+    throw new Error("Không tìm thấy phòng học");
+  }
+
+  const validSeats = room.ChoNgoi.map(cho => cho.SoCho);
+  const invalidSeats = bookingData.ChoNgoiDaChon.filter(cho => !validSeats.includes(cho));
+  if (invalidSeats.length > 0) {
+    throw new Error(`Chỗ ngồi không hợp lệ: ${invalidSeats.join(', ')}`);
+  }
+
+  // THÊM - Kiểm tra chỗ ngồi đã bị đặt chưa
+  const conflictBooking = await TheoDoiDatPhong.findOne({
+    PhongHoc: bookingData.PhongHoc,
+    NgaySuDung: bookingData.NgaySuDung,
+    TrangThai: { $in: ['pending', 'approved', 'waiting_members'] },
+    $or: [
+      {
+        $and: [
+          { GioBatDau: { $lt: bookingData.GioKetThuc } },
+          { GioKetThuc: { $gt: bookingData.GioBatDau } }
+        ]
+      }
+    ],
+    // THÊM - Kiểm tra trùng chỗ ngồi
+    ChoNgoiDaChon: { $in: bookingData.ChoNgoiDaChon }
+  });
+
+  if (conflictBooking) {
+    const trungCho = conflictBooking.ChoNgoiDaChon.filter(cho => 
+      bookingData.ChoNgoiDaChon.includes(cho)
+    );
+    throw new Error(`Chỗ ngồi ${trungCho.join(', ')} đã có người đặt trong khung giờ này`);
+  }
+
+  // Phần validation giờ giữ nguyên
+  if (!bookingData.GioBatDau || !bookingData.GioKetThuc) {
+    throw new Error("Thiếu thông tin giờ bắt đầu hoặc giờ kết thúc");
+  }
+
+  if (bookingData.GioBatDau >= bookingData.GioKetThuc) {
+    throw new Error("Giờ bắt đầu phải nhỏ hơn giờ kết thúc");
+  }
+
   let thanhVienData = [];
-  let trangThai = "pending"; // ← Mặc định là pending (phòng cá nhân)
+  let trangThai = "pending";
 
   if (bookingData.ThanhVien && bookingData.ThanhVien.length > 0) {
     thanhVienData = bookingData.ThanhVien.map((memberId) => ({
       DocGia: memberId,
       TrangThai: "invited",
     }));
-
-    trangThai = "waiting_members"; // ← Phòng nhóm chờ thành viên chấp nhận
+    trangThai = "waiting_members";
   }
 
   const newBooking = new TheoDoiDatPhong({
@@ -282,7 +346,8 @@ async function createBooking(bookingData) {
     PhongHoc: bookingData.PhongHoc,
     DocGia: bookingData.DocGia,
     ThanhVien: thanhVienData,
-    TrangThai: trangThai, // ← SỬA: Dùng biến trangThai động
+    TrangThai: trangThai,
+    ChoNgoiDaChon: bookingData.ChoNgoiDaChon // THÊM dòng này
   });
 
   const savedBooking = await newBooking.save();
@@ -299,7 +364,10 @@ async function createBooking(bookingData) {
 async function getAllBookRoomAdmin() {
   try {
     const bookings = await TheoDoiDatPhong.find()
-      .populate("PhongHoc")
+      .populate({
+        path: "PhongHoc",
+        populate: { path: "ViTri" } 
+      })
       .populate("DocGia")
       .populate("ThanhVien.DocGia")
       .lean();
@@ -311,6 +379,7 @@ async function getAllBookRoomAdmin() {
       GioBatDau: b.GioBatDau,
       GioKetThuc: b.GioKetThuc,
       TrangThai: b.TrangThai,
+      ChoNgoiDaChon: b.ChoNgoiDaChon || [],
 
       PhongHoc: b.PhongHoc
         ? {
@@ -319,6 +388,9 @@ async function getAllBookRoomAdmin() {
             TenPhong: b.PhongHoc.TenPhong,
             LoaiPhong: b.PhongHoc.LoaiPhong,
             SucChua: b.PhongHoc.SucChua,
+            TienIch: b.PhongHoc.TienIch || '',
+            ChoNgoi: b.PhongHoc.ChoNgoi || [], 
+            ViTri: b.PhongHoc.ViTri 
           }
         : null,
 
@@ -571,12 +643,14 @@ async function getMyInvitations(userId) {
                 _id: booking.PhongHoc._id,
                 MaPhong: booking.PhongHoc.MaPhong,
                 TenPhong: booking.PhongHoc.TenPhong,
+                ChoNgoi: booking.PhongHoc.ChoNgoi || [],
               }
             : null,
           NgaySuDung: booking.NgaySuDung,
           GioBatDau: booking.GioBatDau,
           GioKetThuc: booking.GioKetThuc,
-          TrangThai: myMemberInfo.TrangThai, // invited / accepted / declined
+          TrangThai: myMemberInfo.TrangThai,
+          ChoNgoiDaChon: booking.ChoNgoiDaChon || [],
           DocGia: booking.DocGia
             ? {
                 _id: booking.DocGia._id,
@@ -806,6 +880,7 @@ async function getBookingsAsMember(userId) {
         GioBatDau: b.GioBatDau,
         GioKetThuc: b.GioKetThuc,
         TrangThai: b.TrangThai,
+        ChoNgoiDaChon: b.ChoNgoiDaChon || [],
         PhongHoc: b.PhongHoc
           ? {
               _id: b.PhongHoc._id,
@@ -814,6 +889,8 @@ async function getBookingsAsMember(userId) {
               LoaiPhong: b.PhongHoc.LoaiPhong,
               SucChua: b.PhongHoc.SucChua,
               ViTri: b.PhongHoc.ViTri,
+              TienIch: b.PhongHoc.TienIch || 'Chưa có thông tin',
+              ChoNgoi: b.PhongHoc.ChoNgoi || [],
             }
           : null,
         DocGia: nguoiDatPhong, // Thông tin người đặt phòng
@@ -827,6 +904,64 @@ async function getBookingsAsMember(userId) {
     );
     throw err;
   }
+}
+
+async function getAvailableSeats(phongHocId, ngaySuDung, gioBatDau, gioKetThuc) {
+  if (!phongHocId || !ngaySuDung || !gioBatDau || !gioKetThuc) {
+    throw new Error("Thiếu thông tin để kiểm tra chỗ trống");
+  }
+
+  // Lấy thông tin phòng
+  const room = await PhongHoc.findById(phongHocId);
+  if (!room) {
+    throw new Error("Không tìm thấy phòng học");
+  }
+
+  // Lấy tất cả chỗ ngồi của phòng
+  const allSeats = room.ChoNgoi.map(cho => cho.SoCho);
+
+  // Tìm các booking trùng thời gian
+  const conflictBookings = await TheoDoiDatPhong.find({
+    PhongHoc: phongHocId,
+    NgaySuDung: new Date(ngaySuDung),
+    TrangThai: { $in: ['approved'] },
+    $or: [
+      {
+        $and: [
+          { GioBatDau: { $lt: gioKetThuc } },
+          { GioKetThuc: { $gt: gioBatDau } }
+        ]
+      }
+    ]
+  });
+
+  // Lấy danh sách chỗ đã đặt
+  const bookedSeats = [];
+  conflictBookings.forEach(booking => {
+    if (booking.ChoNgoiDaChon && booking.ChoNgoiDaChon.length > 0) {
+      bookedSeats.push(...booking.ChoNgoiDaChon);
+    }
+  });
+
+  // Tính chỗ còn trống
+  const availableSeats = allSeats.filter(seat => !bookedSeats.includes(seat));
+
+  return {
+    allSeats: room.ChoNgoi,
+    bookedSeats: bookedSeats,
+    availableSeats: availableSeats,
+    totalSeats: allSeats.length,
+    availableCount: availableSeats.length
+  };
+}
+
+async function getRoomById(roomId) {
+  if (!roomId) {
+    throw new Error("Thiếu roomId");
+  }
+  
+  const room = await PhongHoc.findById(roomId).populate('ViTri').lean();
+  return room;
 }
 
 module.exports = {
@@ -849,4 +984,6 @@ module.exports = {
   respondToInvitation,
   checkMemberConflict,
   getBookingsAsMember,
+  getAvailableSeats,
+  getRoomById
 };

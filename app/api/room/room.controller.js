@@ -6,7 +6,7 @@ const {
 
 async function addRoom(req, res) {
   try {
-    const { TenPhong, LoaiPhong, SucChua, ViTri, KhungGio } = req.body;
+    const { TenPhong, LoaiPhong, SucChua, ViTri, TienIch} = req.body;
 
     // Trim dữ liệu chuỗi
     const roomData = {
@@ -14,38 +14,13 @@ async function addRoom(req, res) {
       LoaiPhong: LoaiPhong ? LoaiPhong.trim() : null,
       SucChua: SucChua,
       ViTri: ViTri ? ViTri.trim() : null,
-      KhungGio: KhungGio, // THÊM MỚI
+      TienIch: TienIch ? TienIch.trim() : null,
     };
     // Kiểm tra dữ liệu bắt buộc
-    if (!roomData.TenPhong || !roomData.LoaiPhong || !roomData.SucChua) {
+    if (!roomData.TenPhong || !roomData.LoaiPhong || !roomData.SucChua || !roomData.TienIch) {
       return res
         .status(400)
         .send("Thiếu dữ liệu: TenPhong, LoaiPhong hoặc SucChua");
-    }
-
-    // THÊM MỚI - Kiểm tra KhungGio
-    if (
-      !roomData.KhungGio ||
-      !Array.isArray(roomData.KhungGio) ||
-      roomData.KhungGio.length === 0
-    ) {
-      return res
-        .status(400)
-        .send("Thiếu dữ liệu: Phòng phải có ít nhất một khung giờ");
-    }
-
-    // THÊM MỚI - Validate từng khung giờ
-    for (const slot of roomData.KhungGio) {
-      if (!slot.GioBatDau || !slot.GioKetThuc) {
-        return res
-          .status(400)
-          .send("Mỗi khung giờ phải có GioBatDau và GioKetThuc");
-      }
-
-      // Kiểm tra logic thời gian
-      if (slot.GioBatDau >= slot.GioKetThuc) {
-        return res.status(400).send("GioBatDau phải nhỏ hơn GioKetThuc");
-      }
     }
 
     // Gọi service để thêm phòng
@@ -82,7 +57,7 @@ async function getAllRoom(req, res) {
 
 async function updateRoom(req, res) {
   try {
-    const { _id, TenPhong, LoaiPhong, SucChua, ViTri, KhungGio } = req.body; // THÊM KhungGio
+    const { _id, TenPhong, LoaiPhong, SucChua, ViTri, TienIch} = req.body; // THÊM KhungGio
 
     if (!_id) {
       return res.status(400).send("Thiếu dữ liệu: _id");
@@ -95,40 +70,15 @@ async function updateRoom(req, res) {
       LoaiPhong: LoaiPhong ? LoaiPhong.trim() : null,
       SucChua: SucChua,
       ViTri: ViTri ? ViTri.trim() : null,
-      KhungGio: KhungGio, // THÊM DÒNG NÀY
+      TienIch: TienIch ? TienIch.trim() : null,
     };
 
     // Kiểm tra dữ liệu bắt buộc
-    if (!roomData.TenPhong || !roomData.LoaiPhong || !roomData.SucChua) {
+    if (!roomData.TenPhong || !roomData.LoaiPhong || !roomData.SucChua  || !roomData.TienIch) {
       return res
         .status(400)
         .send("Thiếu dữ liệu: TenPhong, LoaiPhong hoặc SucChua");
     }
-
-    // THÊM ĐOẠN NÀY - Kiểm tra KhungGio
-    if (
-      !roomData.KhungGio ||
-      !Array.isArray(roomData.KhungGio) ||
-      roomData.KhungGio.length === 0
-    ) {
-      return res
-        .status(400)
-        .send("Thiếu dữ liệu: Phòng phải có ít nhất một khung giờ");
-    }
-
-    // Validate từng khung giờ
-    for (const slot of roomData.KhungGio) {
-      if (!slot.GioBatDau || !slot.GioKetThuc) {
-        return res
-          .status(400)
-          .send("Mỗi khung giờ phải có GioBatDau và GioKetThuc");
-      }
-
-      if (slot.GioBatDau >= slot.GioKetThuc) {
-        return res.status(400).send("GioBatDau phải nhỏ hơn GioKetThuc");
-      }
-    }
-    // HẾT ĐOẠN THÊM
 
     // Gọi service để cập nhật phòng
     const result = await roomService.updateRoom(roomData);
@@ -190,7 +140,24 @@ async function getAllBookRoomByUserId(req, res) {
 
 async function createBooking(req, res) {
   try {
-    const { _idDocGia, PhongHoc, NgaySuDung, GioBatDau, GioKetThuc, ThanhVien } = req.body;
+    const { 
+      _idDocGia, 
+      PhongHoc, 
+      NgaySuDung, 
+      GioBatDau, 
+      GioKetThuc, 
+      ThanhVien,
+      ChoNgoiDaChon // THÊM dòng này
+    } = req.body;
+
+    // THÊM validation
+    if (!ChoNgoiDaChon || !Array.isArray(ChoNgoiDaChon) || ChoNgoiDaChon.length === 0) {
+      return res.status(400).send("Vui lòng chọn chỗ ngồi");
+    }
+
+    if (!GioBatDau || !GioKetThuc) {
+      return res.status(400).send("Thiếu thông tin giờ bắt đầu hoặc giờ kết thúc");
+    }
 
     const bookingData = {
       DocGia: _idDocGia,
@@ -198,14 +165,24 @@ async function createBooking(req, res) {
       NgaySuDung: new Date(NgaySuDung),
       GioBatDau: GioBatDau.trim(),
       GioKetThuc: GioKetThuc.trim(),
-      ThanhVien: ThanhVien || []
+      ThanhVien: ThanhVien || [],
+      ChoNgoiDaChon: ChoNgoiDaChon // THÊM dòng này
     };
 
     const result = await roomService.createBooking(bookingData);
-
     res.json(result);
   } catch (error) {
     console.error("Lỗi khi tạo booking:", error);
+    
+    // THÊM xử lý lỗi cụ thể
+    if (error.message.includes("Chỗ ngồi")) {
+      return res.status(409).send(error.message);
+    }
+    
+    if (error.message.includes("Khung giờ này đã có người đặt")) {
+      return res.status(409).send(error.message);
+    }
+    
     res.status(500).send("Lỗi khi tạo booking: " + error.message);
   }
 }
@@ -350,11 +327,12 @@ async function getRoomRule(req, res) {
 
 async function updateRoomRule(req, res) {
   try {
-    const { preOrderLimitDays } = req.body;
+    const { bookingLeadTime, bookingLeadTimeLecturer } = req.body;
 
     // Gọi service để cập nhật quy định phòng học
     const updatedRule = await roomService.updateRoomRule({
-      preOrderLimitDays,
+      bookingLeadTime,
+      bookingLeadTimeLecturer,
     });
 
     res.status(200).json(updatedRule);
@@ -480,6 +458,49 @@ async function getBookingsAsMember(req, res) {
   }
 }
 
+async function getAvailableSeats(req, res) {
+  try {
+    const { phongHocId, ngaySuDung, gioBatDau, gioKetThuc } = req.body;
+
+    if (!phongHocId || !ngaySuDung || !gioBatDau || !gioKetThuc) {
+      return res.status(400).send("Thiếu thông tin: phongHocId, ngaySuDung, gioBatDau, gioKetThuc");
+    }
+
+    const result = await roomService.getAvailableSeats(
+      phongHocId, 
+      ngaySuDung, 
+      gioBatDau, 
+      gioKetThuc
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách chỗ trống:", error);
+    res.status(500).send("Lỗi khi lấy danh sách chỗ trống: " + error.message);
+  }
+}
+
+async function getRoomById(req, res) {
+  try {
+    const { roomId } = req.body;
+    
+    if (!roomId) {
+      return res.status(400).send("Thiếu roomId");
+    }
+    
+    const result = await roomService.getRoomById(roomId);
+    
+    if (!result) {
+      return res.status(404).send("Không tìm thấy phòng");
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy thông tin phòng:", error);
+    res.status(500).send("Lỗi khi lấy thông tin phòng");
+  }
+}
+
 module.exports = {
   addRoom,
   getAllRoom,
@@ -499,5 +520,7 @@ module.exports = {
   getMyInvitations,
   respondToInvitation,
   checkMemberConflict,
-  getBookingsAsMember
+  getBookingsAsMember,
+  getAvailableSeats,
+  getRoomById
 };

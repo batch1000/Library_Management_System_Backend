@@ -64,7 +64,12 @@ const TheoDoiDatPhongSchema = new mongoose.Schema({
         default: 'invited'
       }
     }
-  ]
+  ],
+
+  ChoNgoiDaChon: {
+    type: [Number], // Mảng số chỗ đã chọn [1, 2, 3]
+    default: []
+  }
 }, {
   timestamps: true
 });

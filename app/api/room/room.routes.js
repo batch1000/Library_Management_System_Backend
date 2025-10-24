@@ -20,7 +20,9 @@ const
         getMyInvitations,
         respondToInvitation,
         checkMemberConflict,
-        getBookingsAsMember
+        getBookingsAsMember,
+        getAvailableSeats,
+        getRoomById
     } = require('./room.controller')
 
 const router = express.Router();
@@ -49,5 +51,7 @@ router.post("/respondToInvitation", respondToInvitation)
 router.post("/checkMemberConflict", checkMemberConflict)
 router.post("/getBookingsAsMember", getBookingsAsMember)
 
+router.post("/getAvailableSeats", getAvailableSeats)
+router.post('/getRoomById', getRoomById);
 
 module.exports = router;
