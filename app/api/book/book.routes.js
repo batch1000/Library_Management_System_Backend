@@ -55,7 +55,16 @@ const {
   getOneTextBook,
   getAllFaculty,
   addFaculty,
-  updatePenaltyFee
+  updatePenaltyFee,
+  createDotNop,
+  getAllDotNop,
+  updateDotNop,
+  deleteDotNop,
+  getActiveDotNop,
+  getAllNamHoc,
+  getAllKyHoc,
+  addKyHoc,
+  addNamHoc
 } = require("./book.controller");
 
 const router = express.Router();
@@ -145,6 +154,7 @@ router.get("/getBookPenaltyRule", getBookPenaltyRule);
 router.post("/updateBookPenaltyRule", updateBookPenaltyRule);
 router.get("/getBookBorrowRule", getBookBorrowRule);
 router.post("/updateBookBorrowRule", updateBookBorrowRule);
+router.post("/updatePenaltyFee", updatePenaltyFee);
 
 router.post(
   "/addThesis",
@@ -159,6 +169,14 @@ router.get("/getAllThesis", getAllThesis);
 router.post("/approveThesis", approveThesis);
 router.post("/rejectThesis", rejectThesis);
 
-router.post("/updatePenaltyFee", updatePenaltyFee);
+router.post("/createDotNop", createDotNop);
+router.get("/getAllDotNop", getAllDotNop);
+router.post("/updateDotNop", updateDotNop);
+router.post("/deleteDotNop", deleteDotNop);
+router.get("/getActiveDotNop", getActiveDotNop);
+router.get("/getAllNamHoc", getAllNamHoc);
+router.get("/getAllKyHoc", getAllKyHoc);
+router.post("/addKyHoc", addKyHoc);
+router.post("/addNamHoc", addNamHoc);
 
 module.exports = router;

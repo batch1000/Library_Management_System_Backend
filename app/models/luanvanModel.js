@@ -49,6 +49,12 @@ const LuanVanSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+
+    MaDotNop: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "DotNopLuanVan",
+        required: true
+    },
 }, {
     timestamps: true
 });

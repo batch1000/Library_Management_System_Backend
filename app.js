@@ -715,6 +715,43 @@ function normalizeDate(date) {
   }
 })();
 
+// Auto check đóng đợt nộp luận văn
+const DotNopLuanVan = require("./app/models/dotnopluanvanModel");
+
+function normalizeDate(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+(async () => {
+  try {
+    const today = normalizeDate(new Date());
+
+    // Lấy tất cả đợt nộp có trạng thái khác "Đã đóng"
+    const dots = await DotNopLuanVan.find({
+      TrangThai: { $ne: "Đã đóng" },
+    });
+
+    let hasClosed = false;
+
+    for (const dot of dots) {
+      const thoiGianDong = normalizeDate(dot.ThoiGianDongNop);
+
+      if (today > thoiGianDong) {
+        dot.TrangThai = "Đã đóng";
+        await dot.save();
+        console.log(`Đợt nộp "${dot.TenDot}" đã được cập nhật sang trạng thái "Đã đóng".`);
+        hasClosed = true;
+      }
+    }
+
+    if (!hasClosed) {
+      console.log("✅ Không có đợt nộp nào cần đóng hôm nay.");
+    }
+  } catch (err) {
+    console.error("❌ Lỗi khi kiểm tra tự động đóng đợt nộp:", err);
+  }
+})();
+
 // const QuyDinhPhongHoc = require('./app/models/quydinhphonghocModel');
 // (async () => {
 //   try {

@@ -13,6 +13,9 @@ const DocGia = require("../../models/docgiaModel");
 const LuanVan = require("../../models/luanvanModel");
 const SinhVien = require("../../models/sinhvienModel");
 const Khoa = require("../../models/khoaModel");
+const DotNopLuanVan = require("../../models/dotnopluanvanModel");
+const KyHoc = require("../../models/kyhocModel");
+const NamHoc = require("../../models/namhocModel");
 
 const notificationService = require("../notification/notification.service");
 
@@ -1976,6 +1979,7 @@ async function addThesis(data) {
       GiaoVienHuongDan: data.GiaoVienHuongDan,
       Pdf: data.Pdf,
       Image: data.Image,
+      MaDotNop: data.MaDotNop, // ✅ THÊM dòng này
     });
 
     const savedThesis = await newThesis.save();
@@ -2014,6 +2018,21 @@ async function getAllThesis() {
             },
           },
         },
+      })
+      // ✅ THÊM ĐOẠN NÀY
+      .populate({
+        path: "MaDotNop",
+        select: "TenDot ThoiGianMoNop ThoiGianDongNop TrangThai KyHoc NamHoc",
+        populate: [
+          {
+            path: "KyHoc",
+            select: "TenKyHoc"
+          },
+          {
+            path: "NamHoc", 
+            select: "TenNamHoc"
+          }
+        ]
       })
       .lean();
   } catch (err) {
@@ -2114,6 +2133,178 @@ async function updatePenaltyFee(requestId, adminId, newTotalFee, reason) {
   }
 }
 
+
+// 1. Tạo đợt nộp
+async function createDotNop(data) {
+  try {
+    const { ThoiGianMoNop, ThoiGianDongNop } = data;
+    
+    // Xác định trạng thái dựa trên thời gian hiện tại
+    const now = new Date();
+    const moNop = new Date(ThoiGianMoNop);
+    const dongNop = new Date(ThoiGianDongNop);
+    
+    let trangThai = "Chưa mở";
+    if (now >= moNop && now <= dongNop) {
+      trangThai = "Đang mở";
+    } else if (now > dongNop) {
+      trangThai = "Đã đóng";
+    }
+
+    const newDotNop = new DotNopLuanVan({
+      ...data,
+      TrangThai: trangThai,
+    });
+
+    const savedDotNop = await newDotNop.save();
+    return await DotNopLuanVan.findById(savedDotNop._id)
+      .populate("KyHoc")
+      .populate("NamHoc")
+      .lean();
+  } catch (err) {
+    console.error("Lỗi khi tạo đợt nộp:", err);
+    throw err;
+  }
+}
+
+// 2. Lấy tất cả đợt nộp
+async function getAllDotNop() {
+  try {
+    return await DotNopLuanVan.find()
+      .populate("KyHoc")
+      .populate("NamHoc")
+      .sort({ createdAt: -1 })
+      .lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 3. Cập nhật đợt nộp
+async function updateDotNop(dotNopId, updateData) {
+  try {
+    // Nếu có cập nhật thời gian, tính lại trạng thái
+    if (updateData.ThoiGianMoNop || updateData.ThoiGianDongNop) {
+      const dotNop = await DotNopLuanVan.findById(dotNopId);
+      const now = new Date();
+      const moNop = new Date(updateData.ThoiGianMoNop || dotNop.ThoiGianMoNop);
+      const dongNop = new Date(updateData.ThoiGianDongNop || dotNop.ThoiGianDongNop);
+      
+      if (now >= moNop && now <= dongNop) {
+        updateData.TrangThai = "Đang mở";
+      } else if (now > dongNop) {
+        updateData.TrangThai = "Đã đóng";
+      } else {
+        updateData.TrangThai = "Chưa mở";
+      }
+    }
+
+    const updated = await DotNopLuanVan.findByIdAndUpdate(
+      dotNopId,
+      updateData,
+      { new: true }
+    )
+      .populate("KyHoc")
+      .populate("NamHoc")
+      .lean();
+
+    if (!updated) {
+      throw new Error("Không tìm thấy đợt nộp");
+    }
+
+    return updated;
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 4. Xóa đợt nộp
+async function deleteDotNop(dotNopId) {
+  try {
+    // Kiểm tra xem có luận văn nào thuộc đợt này không
+    const thesisCount = await LuanVan.countDocuments({ MaDotNop: dotNopId });
+    
+    if (thesisCount > 0) {
+      throw new Error("Không thể xóa đợt nộp đã có luận văn");
+    }
+
+    const deleted = await DotNopLuanVan.findByIdAndDelete(dotNopId);
+    
+    if (!deleted) {
+      throw new Error("Không tìm thấy đợt nộp");
+    }
+
+    return { message: "Xóa đợt nộp thành công" };
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 5. Lấy đợt nộp đang mở
+async function getActiveDotNop() {
+  try {
+    const now = new Date();
+    return await DotNopLuanVan.findOne({
+      TrangThai: "Đang mở",
+      ThoiGianMoNop: { $lte: now },
+      ThoiGianDongNop: { $gte: now },
+    })
+      .populate("KyHoc")
+      .populate("NamHoc")
+      .lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 6. Lấy tất cả năm học
+async function getAllNamHoc() {
+  try {
+    return await NamHoc.find().sort({ TenNamHoc: -1 }).lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 7. Lấy tất cả kỳ học
+async function getAllKyHoc() {
+  try {
+    return await KyHoc.find().lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+// Thêm kỳ học
+async function addKyHoc(TenKyHoc) {
+  try {
+    const newKyHoc = new KyHoc({
+      TenKyHoc: TenKyHoc
+    });
+
+    const saved = await newKyHoc.save();
+    return saved;
+  } catch (err) {
+    console.error("Lỗi khi thêm kỳ học:", err);
+    throw err;
+  }
+}
+
+// Thêm năm học
+async function addNamHoc(TenNamHoc) {
+  try {
+    const newNamHoc = new NamHoc({
+      TenNamHoc: TenNamHoc
+    });
+
+    const saved = await newNamHoc.save();
+    return saved;
+  } catch (err) {
+    console.error("Lỗi khi thêm năm học:", err);
+    throw err;
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -2168,5 +2359,14 @@ module.exports = {
   getOneTextBook,
   getAllFaculty,
   addFaculty,
-  updatePenaltyFee
+  updatePenaltyFee,
+  createDotNop,
+  getAllDotNop,
+  updateDotNop,
+  deleteDotNop,
+  getActiveDotNop,
+  getAllNamHoc,
+  getAllKyHoc,
+  addKyHoc,
+  addNamHoc
 };

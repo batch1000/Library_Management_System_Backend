@@ -553,16 +553,13 @@ async function updateOverdueFee(req, res) {
 
 async function extendBorrowTime(req, res) {
   try {
-    const { requestId, adminId} = req.body;
+    const { requestId, adminId } = req.body;
 
     if (!requestId || !adminId) {
       return res.status(400).send("Thiếu thông tin cần thiết");
     }
 
-    const updated = await bookService.extendBorrowTime(
-      requestId,
-      adminId
-    );
+    const updated = await bookService.extendBorrowTime(requestId, adminId);
     res.json(updated);
   } catch (error) {
     console.error("Lỗi khi gia hạn mượn sách:", error);
@@ -1039,7 +1036,7 @@ async function updateBookBorrowRule(req, res) {
       maxBooksPerDayLecturer,
       borrowDurationLecturer,
       pickupDeadlineLecturer,
-      renewalDurationLecturer
+      renewalDurationLecturer,
     } = req.body;
 
     // gọi service để update
@@ -1053,7 +1050,7 @@ async function updateBookBorrowRule(req, res) {
       maxBooksPerDayLecturer,
       borrowDurationLecturer,
       pickupDeadlineLecturer,
-      renewalDurationLecturer
+      renewalDurationLecturer,
     });
 
     res.status(200).json(updatedRule);
@@ -1065,20 +1062,57 @@ async function updateBookBorrowRule(req, res) {
   }
 }
 
+async function updatePenaltyFee(req, res) {
+  try {
+    const { requestId, adminId, newTotalFee, reason } = req.body;
+
+    if (!requestId || !adminId || newTotalFee === undefined || !reason) {
+      return res.status(400).send("Thiếu thông tin cần thiết");
+    }
+
+    if (newTotalFee < 0) {
+      return res.status(400).send("Tổng phí không hợp lệ");
+    }
+
+    if (!reason.trim()) {
+      return res.status(400).send("Vui lòng nhập lý do điều chỉnh");
+    }
+
+    const updated = await bookService.updatePenaltyFee(
+      requestId,
+      adminId,
+      newTotalFee,
+      reason
+    );
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Lỗi khi cập nhật tổng phí phạt:", error);
+    res.status(500).send(error.message || "Cập nhật tổng phí phạt thất bại");
+  }
+}
+
+
 async function addThesis(req, res) {
   try {
     const body = req.body;
     const files = req.files;
 
+    // ✅ THÊM: Kiểm tra đợt nộp đang mở
+    const activeDotNop = await bookService.getActiveDotNop();
+    if (!activeDotNop) {
+      return res.status(400).json({ 
+        error: "Hiện tại không có đợt nộp luận văn nào đang mở" 
+      });
+    }
+
     const imageFile = files && files.image ? files.image[0] : null;
     const pdfFile = files && files.pdfFile ? files.pdfFile[0] : null;
 
-    // Bắt buộc phải có PDF
     if (!pdfFile) {
       return res.status(400).send("Vui lòng chọn file PDF luận văn");
     }
 
-    // Upload PDF
     const pdfUploadResult = await uploadToCloudinary(pdfFile.buffer);
     if (!pdfUploadResult) {
       console.log("Lỗi khi upload PDF lên cloud");
@@ -1086,7 +1120,6 @@ async function addThesis(req, res) {
     }
     const pdfUrl = pdfUploadResult.secure_url;
 
-    // Upload ảnh (nếu có)
     let imageUrl = null;
     if (imageFile) {
       const uploadResult = await uploadToCloudinary(imageFile.buffer);
@@ -1097,15 +1130,15 @@ async function addThesis(req, res) {
       imageUrl = uploadResult.secure_url;
     }
 
-    // Chuẩn bị dữ liệu để lưu
     const thesisData = {
       TieuDeTai: body.topicName,
-      MaSV: body.userId, // _id sinh viên gửi từ client
+      MaSV: body.userId,
       BacDaoTao: body.educationLevel,
       NamBaoVe: Number(body.defenseYear),
       GiaoVienHuongDan: body.supervisor,
       Pdf: pdfUrl,
       Image: imageUrl,
+      MaDotNop: activeDotNop._id, // ✅ THÊM: Gán đợt nộp
     };
 
     const result = await bookService.addThesis(thesisData);
@@ -1176,33 +1209,156 @@ async function rejectThesis(req, res) {
   }
 }
 
-async function updatePenaltyFee(req, res) {
+// 1. Tạo đợt nộp luận văn
+async function createDotNop(req, res) {
   try {
-    const { requestId, adminId, newTotalFee, reason } = req.body;
+    const { TenDot, ThoiGianMoNop, ThoiGianDongNop, KyHoc, NamHoc } = req.body;
 
-    if (!requestId || !adminId || newTotalFee === undefined || !reason) {
-      return res.status(400).send("Thiếu thông tin cần thiết");
+    if (!TenDot || !ThoiGianMoNop || !ThoiGianDongNop || !KyHoc || !NamHoc) {
+      return res.status(400).json({ error: "Vui lòng điền đầy đủ thông tin" });
     }
 
-    if (newTotalFee < 0) {
-      return res.status(400).send("Tổng phí không hợp lệ");
-    }
+    const result = await bookService.createDotNop({
+      TenDot,
+      ThoiGianMoNop,
+      ThoiGianDongNop,
+      KyHoc,
+      NamHoc,
+    });
 
-    if (!reason.trim()) {
-      return res.status(400).send("Vui lòng nhập lý do điều chỉnh");
-    }
-
-    const updated = await bookService.updatePenaltyFee(
-      requestId,
-      adminId,
-      newTotalFee,
-      reason
-    );
-
-    res.json(updated);
+    res.json(result);
+    console.log("Tạo đợt nộp thành công:", result._id);
   } catch (error) {
-    console.error("Lỗi khi cập nhật tổng phí phạt:", error);
-    res.status(500).send(error.message || "Cập nhật tổng phí phạt thất bại");
+    console.error("Lỗi khi tạo đợt nộp:", error);
+    res.status(500).json({ error: "Tạo đợt nộp thất bại" });
+  }
+}
+
+// 2. Lấy tất cả đợt nộp
+async function getAllDotNop(req, res) {
+  try {
+    const result = await bookService.getAllDotNop();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách đợt nộp:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy danh sách đợt nộp" });
+  }
+}
+
+// 3. Cập nhật đợt nộp
+async function updateDotNop(req, res) {
+  try {
+    const { dotNopId, ...updateData } = req.body;
+
+    if (!dotNopId) {
+      return res.status(400).json({ error: "Thiếu dotNopId" });
+    }
+
+    const result = await bookService.updateDotNop(dotNopId, updateData);
+    res.json(result);
+    console.log("Cập nhật đợt nộp thành công:", result._id);
+  } catch (error) {
+    console.error("Lỗi khi cập nhật đợt nộp:", error);
+    res.status(500).json({ error: "Cập nhật đợt nộp thất bại" });
+  }
+}
+
+// 4. Xóa đợt nộp
+async function deleteDotNop(req, res) {
+  try {
+    const { dotNopId } = req.body;
+
+    if (!dotNopId) {
+      return res.status(400).json({ error: "Thiếu dotNopId" });
+    }
+
+    const result = await bookService.deleteDotNop(dotNopId);
+    res.json(result);
+    console.log("Xóa đợt nộp thành công");
+  } catch (error) {
+    console.error("Lỗi khi xóa đợt nộp:", error);
+    res.status(500).json({ error: "Xóa đợt nộp thất bại" });
+  }
+}
+
+// 5. Lấy đợt nộp đang mở
+async function getActiveDotNop(req, res) {
+  try {
+    const result = await bookService.getActiveDotNop();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy đợt nộp đang mở:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy đợt nộp đang mở" });
+  }
+}
+
+// 6. Lấy tất cả năm học
+async function getAllNamHoc(req, res) {
+  try {
+    const result = await bookService.getAllNamHoc();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách năm học:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy danh sách năm học" });
+  }
+}
+
+// 7. Lấy tất cả kỳ học
+async function getAllKyHoc(req, res) {
+  try {
+    const result = await bookService.getAllKyHoc();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách kỳ học:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy danh sách kỳ học" });
+  }
+}
+
+// Thêm kỳ học
+async function addKyHoc(req, res) {
+  try {
+    const { TenKyHoc } = req.body;
+
+    if (!TenKyHoc || !TenKyHoc.trim()) {
+      return res.status(400).json({ error: "Vui lòng nhập tên kỳ học" });
+    }
+
+    const result = await bookService.addKyHoc(TenKyHoc.trim());
+    res.json(result);
+    console.log("Thêm kỳ học thành công:", result._id);
+  } catch (error) {
+    console.error("Lỗi khi thêm kỳ học:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({ error: "Kỳ học này đã tồn tại" });
+    }
+    res.status(500).json({ error: "Thêm kỳ học thất bại" });
+  }
+}
+
+// Thêm năm học
+async function addNamHoc(req, res) {
+  try {
+    const { TenNamHoc } = req.body;
+
+    if (!TenNamHoc) {
+      return res.status(400).json({ error: "Vui lòng nhập năm học" });
+    }
+
+    // Kiểm tra định dạng năm học (VD: 2023-2024)
+    const namHocPattern = /^\d{4}-\d{4}$/;
+    if (!namHocPattern.test(TenNamHoc)) {
+      return res.status(400).json({ error: "Định dạng năm học không hợp lệ. VD: 2023-2024" });
+    }
+
+    const result = await bookService.addNamHoc(TenNamHoc);
+    res.json(result);
+    console.log("Thêm năm học thành công:", result._id);
+  } catch (error) {
+    console.error("Lỗi khi thêm năm học:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({ error: "Năm học này đã tồn tại" });
+    }
+    res.status(500).json({ error: "Thêm năm học thất bại" });
   }
 }
 
@@ -1261,5 +1417,14 @@ module.exports = {
   getOneTextBook,
   getAllFaculty,
   addFaculty,
-  updatePenaltyFee
+  updatePenaltyFee,
+  createDotNop,
+  getAllDotNop,
+  updateDotNop,
+  deleteDotNop,
+  getActiveDotNop,
+  getAllNamHoc,
+  getAllKyHoc,
+  addKyHoc,
+  addNamHoc
 };
