@@ -64,7 +64,21 @@ const {
   getAllNamHoc,
   getAllKyHoc,
   addKyHoc,
-  addNamHoc
+  addNamHoc,
+  addNienLuan,
+  getOneNienLuan,
+  createDotNopNienLuan,
+  getAllDotNopNienLuan,
+  updateDotNopNienLuan,
+  deleteDotNopNienLuan,
+  getActiveDotNopNienLuan,
+  getAllNienLuanByGiangVien,
+  approveNienLuan,
+  rejectNienLuan,
+  getAllGiangVien,
+  getAllActiveDotNopNienLuan,
+  checkNienLuanSubmission,
+  getAllNienLuanCuaKhoa
 } = require("./book.controller");
 
 const router = express.Router();
@@ -178,5 +192,34 @@ router.get("/getAllNamHoc", getAllNamHoc);
 router.get("/getAllKyHoc", getAllKyHoc);
 router.post("/addKyHoc", addKyHoc);
 router.post("/addNamHoc", addNamHoc);
+
+
+// Sinh viên - Niên luận
+router.post(
+  "/addNienLuan",
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "pdfFile", maxCount: 1 },
+  ]),
+  addNienLuan
+);
+router.post("/getOneNienLuan", getOneNienLuan);
+
+// Giảng viên - Quản lý đợt nộp niên luận
+router.post("/createDotNopNienLuan", createDotNopNienLuan);
+router.post("/getAllDotNopNienLuan", getAllDotNopNienLuan);
+router.post("/updateDotNopNienLuan", updateDotNopNienLuan);
+router.post("/deleteDotNopNienLuan", deleteDotNopNienLuan);
+router.post("/getActiveDotNopNienLuan", getActiveDotNopNienLuan);
+
+// Giảng viên - Quản lý danh sách niên luận
+router.post("/getAllNienLuanByGiangVien", getAllNienLuanByGiangVien);
+router.post("/getAllNienLuanCuaKhoa", getAllNienLuanCuaKhoa);
+router.post("/approveNienLuan", approveNienLuan);
+router.post("/rejectNienLuan", rejectNienLuan);
+
+router.get("/getAllGiangVien", getAllGiangVien);
+router.get("/getAllActiveDotNopNienLuan/:maDocGia", getAllActiveDotNopNienLuan);
+router.get("/checkNienLuanSubmission/:userId/:dotNopId", checkNienLuanSubmission);
 
 module.exports = router;

@@ -1092,7 +1092,6 @@ async function updatePenaltyFee(req, res) {
   }
 }
 
-
 async function addThesis(req, res) {
   try {
     const body = req.body;
@@ -1362,6 +1361,275 @@ async function addNamHoc(req, res) {
   }
 }
 
+
+// 1. Sinh viên nộp niên luận
+async function addNienLuan(req, res) {
+  try {
+    const body = req.body;
+    const files = req.files;
+
+    const imageFile = files && files.image ? files.image[0] : null;
+    const pdfFile = files && files.pdfFile ? files.pdfFile[0] : null;
+
+    if (!pdfFile) {
+      return res.status(400).json({ error: "Vui lòng chọn file PDF niên luận" });
+    }
+
+    // ✅ KIỂM TRA MÃ ĐỢT NỘP
+    if (!body.maDotNop) {
+      return res.status(400).json({ error: "Vui lòng chọn đợt nộp" });
+    }
+
+    const pdfUploadResult = await uploadToCloudinary(pdfFile.buffer);
+    if (!pdfUploadResult) {
+      return res.status(500).json({ error: "Lỗi khi upload PDF" });
+    }
+    const pdfUrl = pdfUploadResult.secure_url;
+
+    let imageUrl = null;
+    if (imageFile) {
+      const uploadResult = await uploadToCloudinary(imageFile.buffer);
+      if (!uploadResult) {
+        return res.status(500).json({ error: "Lỗi khi upload ảnh" });
+      }
+      imageUrl = uploadResult.secure_url;
+    }
+
+    const nienLuanData = {
+      TenDeTai: body.topicName,
+      MaDocGia: body.userId,  // ✅ Sửa từ MaSV -> MaDocGia
+      MaDotNop: body.maDotNop, // ✅ THÊM MÃ ĐỢT NỘP
+      Pdf: pdfUrl,
+      Image: imageUrl,
+      TrangThai: "Chờ duyệt",  // ✅ THÊM TRẠNG THÁI MẶC ĐỊNH
+      NgayNop: new Date()      // ✅ THÊM NGÀY NỘP
+    };
+
+    const result = await bookService.addNienLuan(nienLuanData);
+    res.json(result);
+    console.log("Nộp niên luận thành công:", result._id);
+  } catch (error) {
+    console.error("Lỗi khi nộp niên luận:", error);
+    res.status(500).json({ error: "Nộp niên luận thất bại" });
+  }
+}
+
+// 2. Lấy 1 niên luận của sinh viên
+async function getOneNienLuan(req, res) {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "Thiếu userId" });
+    }
+
+    const result = await bookService.getOneNienLuan(userId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy niên luận:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy niên luận" });
+  }
+}
+
+// 3. Tạo đợt nộp niên luận (Giảng viên)
+async function createDotNopNienLuan(req, res) {
+  try {
+    const { TenDot, ThoiGianMoNop, ThoiGianDongNop, KyHoc, NamHoc, MaGiangVien } = req.body;
+
+    if (!TenDot || !ThoiGianMoNop || !ThoiGianDongNop || !KyHoc || !NamHoc || !MaGiangVien) {
+      return res.status(400).json({ error: "Vui lòng điền đầy đủ thông tin" });
+    }
+
+    const result = await bookService.createDotNopNienLuan({
+      TenDot,
+      ThoiGianMoNop,
+      ThoiGianDongNop,
+      KyHoc,
+      NamHoc,
+      MaGiangVien,
+    });
+
+    res.json(result);
+    console.log("Tạo đợt nộp niên luận thành công:", result._id);
+  } catch (error) {
+    console.error("Lỗi khi tạo đợt nộp niên luận:", error);
+    res.status(500).json({ error: "Tạo đợt nộp niên luận thất bại" });
+  }
+}
+
+// 4. Lấy tất cả đợt nộp niên luận của giảng viên
+async function getAllDotNopNienLuan(req, res) {
+  try {
+    const { maGiangVien } = req.body;
+
+    if (!maGiangVien) {
+      return res.status(400).json({ error: "Thiếu mã giảng viên" });
+    }
+
+    const result = await bookService.getAllDotNopNienLuan(maGiangVien);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách đợt nộp niên luận:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy danh sách đợt nộp niên luận" });
+  }
+}
+
+// 5. Cập nhật đợt nộp niên luận
+async function updateDotNopNienLuan(req, res) {
+  try {
+    const { dotNopId, ...updateData } = req.body;
+
+    if (!dotNopId) {
+      return res.status(400).json({ error: "Thiếu dotNopId" });
+    }
+
+    const result = await bookService.updateDotNopNienLuan(dotNopId, updateData);
+    res.json(result);
+    console.log("Cập nhật đợt nộp niên luận thành công:", result._id);
+  } catch (error) {
+    console.error("Lỗi khi cập nhật đợt nộp niên luận:", error);
+    res.status(500).json({ error: "Cập nhật đợt nộp niên luận thất bại" });
+  }
+}
+
+// 6. Xóa đợt nộp niên luận
+async function deleteDotNopNienLuan(req, res) {
+  try {
+    const { dotNopId } = req.body;
+
+    if (!dotNopId) {
+      return res.status(400).json({ error: "Thiếu dotNopId" });
+    }
+
+    const result = await bookService.deleteDotNopNienLuan(dotNopId);
+    res.json(result);
+    console.log("Xóa đợt nộp niên luận thành công");
+  } catch (error) {
+    console.error("Lỗi khi xóa đợt nộp niên luận:", error);
+    res.status(500).json({ error: error.message || "Xóa đợt nộp niên luận thất bại" });
+  }
+}
+
+// 7. Lấy đợt nộp đang mở của giảng viên
+async function getActiveDotNopNienLuan(req, res) {
+  try {
+    const { maGiangVien } = req.body;
+
+    if (!maGiangVien) {
+      return res.status(400).json({ error: "Thiếu mã giảng viên" });
+    }
+
+    const result = await bookService.getActiveDotNopNienLuan(maGiangVien);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy đợt nộp niên luận đang mở:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy đợt nộp niên luận đang mở" });
+  }
+}
+
+// 8. Lấy tất cả niên luận theo giảng viên
+async function getAllNienLuanByGiangVien(req, res) {
+  try {
+    const { maGiangVien } = req.body;
+
+    if (!maGiangVien) {
+      return res.status(400).json({ error: "Thiếu mã giảng viên" });
+    }
+
+    const result = await bookService.getAllNienLuanByGiangVien(maGiangVien);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách niên luận:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy danh sách niên luận" });
+  }
+}
+
+async function getAllNienLuanCuaKhoa(req, res) {
+  try {
+    const { maGiangVien } = req.body;
+
+    if (!maGiangVien) {
+      return res.status(400).json({ error: "Thiếu mã giảng viên" });
+    }
+
+    const result = await bookService.getAllNienLuanCuaKhoa(maGiangVien);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách niên luận:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy danh sách niên luận" });
+  }
+}
+
+// 9. Duyệt niên luận
+async function approveNienLuan(req, res) {
+  try {
+    const { nienLuanId } = req.body;
+
+    if (!nienLuanId) {
+      return res.status(400).json({ error: "Thiếu nienLuanId" });
+    }
+
+    const result = await bookService.approveNienLuan(nienLuanId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi duyệt niên luận:", error);
+    res.status(500).json({ error: "Lỗi server khi duyệt niên luận" });
+  }
+}
+
+// 10. Từ chối niên luận
+async function rejectNienLuan(req, res) {
+  try {
+    const { nienLuanId } = req.body;
+
+    if (!nienLuanId) {
+      return res.status(400).json({ error: "Thiếu nienLuanId" });
+    }
+
+    const result = await bookService.rejectNienLuan(nienLuanId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi từ chối niên luận:", error);
+    res.status(500).json({ error: "Lỗi server khi từ chối niên luận" });
+  }
+}
+
+async function getAllGiangVien(req, res) {
+  try {
+    const result = await bookService.getAllGiangVien();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách giảng viên:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy danh sách giảng viên" });
+  }
+}
+
+async function getAllActiveDotNopNienLuan(req, res) {
+  try {
+    const { maDocGia } = req.params;
+    if (!maDocGia) {
+      return res.status(400).json({ error: "Thiếu mã độc giả" });
+    }
+    
+    const result = await bookService.getAllActiveDotNopNienLuan(maDocGia);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách đợt nộp đang mở:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy danh sách đợt nộp đang mở" });
+  }
+}
+
+async function checkNienLuanSubmission(req, res) {
+  try {
+    const { userId, dotNopId } = req.params;
+    const result = await bookService.checkNienLuanSubmission(userId, dotNopId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi kiểm tra niên luận:", error);
+    res.status(500).json({ error: "Lỗi server khi kiểm tra niên luận" });
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -1426,5 +1694,19 @@ module.exports = {
   getAllNamHoc,
   getAllKyHoc,
   addKyHoc,
-  addNamHoc
+  addNamHoc,
+  addNienLuan,
+  getOneNienLuan,
+  createDotNopNienLuan,
+  getAllDotNopNienLuan,
+  updateDotNopNienLuan,
+  deleteDotNopNienLuan,
+  getActiveDotNopNienLuan,
+  getAllNienLuanByGiangVien,
+  approveNienLuan,
+  rejectNienLuan,
+  getAllGiangVien,
+  getAllActiveDotNopNienLuan,
+  checkNienLuanSubmission,
+  getAllNienLuanCuaKhoa
 };

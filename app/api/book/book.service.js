@@ -16,6 +16,10 @@ const Khoa = require("../../models/khoaModel");
 const DotNopLuanVan = require("../../models/dotnopluanvanModel");
 const KyHoc = require("../../models/kyhocModel");
 const NamHoc = require("../../models/namhocModel");
+const NienLuan = require("../../models/nienluanModel");
+const DotNopNienLuan = require("../../models/dotnopnienluanModel");
+const GiangVien = require("../../models/giangvienModel");
+const BoMon = require("../../models/bomonModel");
 
 const notificationService = require("../notification/notification.service");
 
@@ -2305,6 +2309,554 @@ async function addNamHoc(TenNamHoc) {
   }
 }
 
+
+// ==================== SERVICES NIÊN LUẬN ====================
+
+// 1. Sinh viên nộp niên luận
+async function addNienLuan(data) {
+  try {
+    const newNienLuan = new NienLuan({
+      TenDeTai: data.TenDeTai,
+      MaDocGia: data.MaDocGia,  // ✅ Đúng với controller & model
+      Pdf: data.Pdf,
+      Image: data.Image,
+      MaDotNop: data.MaDotNop,
+      TrangThai: data.TrangThai || "Chờ duyệt", // ✅ Thêm fallback
+      NgayNop: data.NgayNop || new Date()       // ✅ Thêm fallback
+    });
+
+    const savedNienLuan = await newNienLuan.save();
+    return savedNienLuan;
+  } catch (err) {
+    console.error("Lỗi khi thêm niên luận:", err);
+    throw err;
+  }
+}
+
+// 2. Lấy 1 niên luận của sinh viên (lấy mới nhất)
+async function getOneNienLuan(userId) {
+  try {
+    return await NienLuan.findOne({ MaDocGia: userId })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "MaDotNop",
+        select: "TenDot ThoiGianMoNop ThoiGianDongNop TrangThai KyHoc NamHoc MaGiangVien",
+        populate: [
+          { path: "KyHoc", select: "TenKyHoc" },
+          { path: "NamHoc", select: "TenNamHoc" },
+          { 
+            path: "MaGiangVien",
+            select: "HoLot Ten"
+          }
+        ],
+      })
+      .lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 3. Tạo đợt nộp niên luận (Giảng viên)
+async function createDotNopNienLuan(data) {
+  try {
+    const { ThoiGianMoNop, ThoiGianDongNop } = data;
+
+    // Xác định trạng thái dựa trên thời gian hiện tại
+    const now = new Date();
+    const moNop = new Date(ThoiGianMoNop);
+    const dongNop = new Date(ThoiGianDongNop);
+
+    let trangThai = "Chưa mở";
+    if (now >= moNop && now <= dongNop) {
+      trangThai = "Đang mở";
+    } else if (now > dongNop) {
+      trangThai = "Đã đóng";
+    }
+
+    const newDotNop = new DotNopNienLuan({
+      ...data,
+      TrangThai: trangThai,
+    });
+
+    const savedDotNop = await newDotNop.save();
+    return await DotNopNienLuan.findById(savedDotNop._id)
+      .populate("KyHoc")
+      .populate("NamHoc")
+      .populate("MaGiangVien", "HoLot Ten")
+      .lean();
+  } catch (err) {
+    console.error("Lỗi khi tạo đợt nộp niên luận:", err);
+    throw err;
+  }
+}
+
+// 4. Lấy tất cả đợt nộp niên luận của giảng viên
+async function getAllDotNopNienLuan(maGiangVien) {
+  try {
+    const dotNopList = await DotNopNienLuan.find({ MaGiangVien: maGiangVien })
+      .populate("KyHoc")
+      .populate("NamHoc")
+      .populate("MaGiangVien", "HoLot Ten")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Đếm số lượng niên luận đã nộp cho từng đợt
+    const result = await Promise.all(
+      dotNopList.map(async (dot) => {
+        const soLuongDaNop = await NienLuan.countDocuments({ 
+          MaDotNop: dot._id 
+        });
+        return {
+          ...dot,
+          soLuongDaNop
+        };
+      })
+    );
+
+    return result;
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 5. Cập nhật đợt nộp niên luận
+async function updateDotNopNienLuan(dotNopId, updateData) {
+  try {
+    // Nếu có cập nhật thời gian, tính lại trạng thái
+    if (updateData.ThoiGianMoNop || updateData.ThoiGianDongNop) {
+      const dotNop = await DotNopNienLuan.findById(dotNopId);
+      const now = new Date();
+      const moNop = new Date(updateData.ThoiGianMoNop || dotNop.ThoiGianMoNop);
+      const dongNop = new Date(updateData.ThoiGianDongNop || dotNop.ThoiGianDongNop);
+
+      if (now >= moNop && now <= dongNop) {
+        updateData.TrangThai = "Đang mở";
+      } else if (now > dongNop) {
+        updateData.TrangThai = "Đã đóng";
+      } else {
+        updateData.TrangThai = "Chưa mở";
+      }
+    }
+
+    const updated = await DotNopNienLuan.findByIdAndUpdate(dotNopId, updateData, {
+      new: true,
+    })
+      .populate("KyHoc")
+      .populate("NamHoc")
+      .populate("MaGiangVien", "HoLot Ten")
+      .lean();
+
+    if (!updated) {
+      throw new Error("Không tìm thấy đợt nộp niên luận");
+    }
+
+    return updated;
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 6. Xóa đợt nộp niên luận
+async function deleteDotNopNienLuan(dotNopId) {
+  try {
+    // Kiểm tra xem có niên luận nào thuộc đợt này không
+    const nienLuanCount = await NienLuan.countDocuments({ MaDotNop: dotNopId });
+
+    if (nienLuanCount > 0) {
+      throw new Error("Không thể xóa đợt nộp đã có niên luận");
+    }
+
+    const deleted = await DotNopNienLuan.findByIdAndDelete(dotNopId);
+
+    if (!deleted) {
+      throw new Error("Không tìm thấy đợt nộp niên luận");
+    }
+
+    return { message: "Xóa đợt nộp niên luận thành công" };
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 7. Lấy đợt nộp đang mở của giảng viên
+async function getActiveDotNopNienLuan(maGiangVien) {
+  try {
+    const now = new Date();
+    return await DotNopNienLuan.findOne({
+      MaGiangVien: maGiangVien,
+      TrangThai: "Đang mở",
+      ThoiGianMoNop: { $lte: now },
+      ThoiGianDongNop: { $gte: now },
+    })
+      .populate("KyHoc")
+      .populate("NamHoc")
+      .populate("MaGiangVien", "HoLot Ten")
+      .lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 7b. Lấy đợt nộp đang mở cho sinh viên (để kiểm tra khi nộp)
+async function getActiveDotNopNienLuanForStudent(data) {
+  try {
+    const { maGiangVien } = data;
+    const now = new Date();
+    
+    return await DotNopNienLuan.findOne({
+      MaGiangVien: maGiangVien,
+      TrangThai: "Đang mở",
+      ThoiGianMoNop: { $lte: now },
+      ThoiGianDongNop: { $gte: now },
+    })
+      .populate("KyHoc")
+      .populate("NamHoc")
+      .lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 8. Lấy tất cả niên luận theo giảng viên (qua các đợt nộp)
+async function getAllNienLuanByGiangVien(maGiangVien) {
+  try {
+    // Lấy tất cả đợt nộp của giảng viên
+    const dotNopList = await DotNopNienLuan.find({ 
+      MaGiangVien: maGiangVien 
+    }).select("_id");
+    
+    const dotNopIds = dotNopList.map(dot => dot._id);
+
+    // Lấy tất cả niên luận thuộc các đợt nộp này
+    return await NienLuan.find({
+      MaDotNop: { $in: dotNopIds }
+    })
+      .populate({
+        path: "MaDocGia",
+        select: "MaDocGia HoLot Ten",
+        populate: {
+          path: "SinhVien",
+          select: "MaSinhVien Avatar MaNganhHoc",
+          populate: {
+            path: "MaNganhHoc",
+            select: "TenNganh Khoa",
+            populate: {
+              path: "Khoa",
+              select: "TenKhoa",
+            },
+          },
+        },
+      })
+      .populate({
+        path: "MaDotNop",
+        select: "TenDot ThoiGianMoNop ThoiGianDongNop TrangThai KyHoc NamHoc",
+        populate: [
+          { path: "KyHoc", select: "TenKyHoc" },
+          { path: "NamHoc", select: "TenNamHoc" },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function getAllNienLuanCuaKhoa(maGiangVien) {
+  try {
+    // 1️⃣ Tìm giảng viên tương ứng với MaDocGia (maGiangVien)
+    const giangVien = await GiangVien.findOne({ MaDocGia: maGiangVien })
+      .populate({
+        path: "MaBoMon",
+        select: "MaKhoa",
+      })
+      .lean();
+
+    if (!giangVien) {
+      throw new Error("Không tìm thấy giảng viên tương ứng với mã độc giả này.");
+    }
+
+    const khoaId =
+      giangVien &&
+      giangVien.MaBoMon &&
+      giangVien.MaBoMon.MaKhoa
+        ? giangVien.MaBoMon.MaKhoa
+        : null;
+
+    if (!khoaId) {
+      throw new Error("Giảng viên chưa thuộc khoa nào.");
+    }
+
+    // 2️⃣ Lấy toàn bộ niên luận đã duyệt
+    const allNienLuan = await NienLuan.find({ TrangThai: "Đã duyệt" })
+      .populate({
+        path: "MaDocGia",
+        select: "MaDocGia HoLot Ten",
+        populate: {
+          path: "SinhVien",
+          select: "MaSinhVien Avatar MaNganhHoc",
+          populate: {
+            path: "MaNganhHoc",
+            select: "TenNganh Khoa",
+            populate: {
+              path: "Khoa",
+              select: "TenKhoa",
+            },
+          },
+        },
+      })
+      .populate({
+        path: "MaDotNop",
+        select:
+          "TenDot ThoiGianMoNop ThoiGianDongNop TrangThai KyHoc NamHoc MaGiangVien",
+        populate: [
+          { path: "KyHoc", select: "TenKyHoc" },
+          { path: "NamHoc", select: "TenNamHoc" },
+          {
+            path: "MaGiangVien",
+            select: "HoLot Ten DoiTuong",
+            model: "DocGia",
+            populate: {
+              path: "GiangVien",
+              select: "MaCanBo Avatar HocVi MaBoMon",
+              populate: {
+                path: "MaBoMon",
+                select: "TenBoMon",
+              },
+            },
+          },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // 3️⃣ Lọc chỉ những niên luận thuộc khoa của giảng viên
+    const nienLuanCuaKhoa = allNienLuan.filter(function (item) {
+      if (
+        item &&
+        item.MaDocGia &&
+        item.MaDocGia.SinhVien &&
+        item.MaDocGia.SinhVien.MaNganhHoc &&
+        item.MaDocGia.SinhVien.MaNganhHoc.Khoa &&
+        item.MaDocGia.SinhVien.MaNganhHoc.Khoa._id &&
+        khoaId
+      ) {
+        return (
+          String(item.MaDocGia.SinhVien.MaNganhHoc.Khoa._id) ===
+          String(khoaId)
+        );
+      }
+      return false;
+    });
+
+    return nienLuanCuaKhoa;
+  } catch (err) {
+    console.error("❌ Lỗi khi lấy danh sách niên luận của khoa:", err);
+    throw err;
+  }
+}
+
+// 9. Duyệt niên luận
+async function approveNienLuan(nienLuanId) {
+  try {
+    const nienLuan = await NienLuan.findByIdAndUpdate(
+      nienLuanId,
+      { TrangThai: "Đã duyệt", NgayNop: new Date() },
+      { new: true }
+    ).populate("MaDocGia");
+
+    if (!nienLuan) {
+      throw new Error("Không tìm thấy niên luận");
+    }
+
+    // Tạo thông báo cho sinh viên
+    if (nienLuan.MaDocGia) {
+      await notificationService.createNotification({
+        DocGia: nienLuan.MaDocGia._id,
+        TieuDe: "Niên luận được duyệt",
+        NoiDung: `Niên luận "${nienLuan.TenDeTai}" của bạn đã được phê duyệt.`,
+        LoaiThongBao: "success",
+      });
+    }
+
+    return nienLuan;
+  } catch (err) {
+    throw err;
+  }
+}
+
+// 10. Từ chối niên luận
+async function rejectNienLuan(nienLuanId) {
+  try {
+    const nienLuan = await NienLuan.findByIdAndUpdate(
+      nienLuanId,
+      { TrangThai: "Từ chối" },
+      { new: true }
+    ).populate("MaDocGia");
+
+    if (!nienLuan) {
+      throw new Error("Không tìm thấy niên luận");
+    }
+
+    // Tạo thông báo cho sinh viên
+    if (nienLuan.MaDocGia) {
+      await notificationService.createNotification({
+        DocGia: nienLuan.MaDocGia._id,
+        TieuDe: "Niên luận bị từ chối",
+        NoiDung: `Niên luận "${nienLuan.TenDeTai}" của bạn đã bị từ chối. Vui lòng liên hệ giảng viên để biết thêm chi tiết.`,
+        LoaiThongBao: "error",
+      });
+    }
+
+    return nienLuan;
+  } catch (err) {
+    throw err;
+  }
+}
+
+async function getAllGiangVien() {
+  try {
+    // Tìm tất cả DocGia có DoiTuong là 'Giảng viên'
+    const docGiaList = await DocGia.find({ DoiTuong: 'Giảng viên' })
+      .select("_id HoLot Ten")
+      .lean();
+    
+    // Populate thông tin GiangVien cho mỗi DocGia
+    const result = await Promise.all(
+      docGiaList.map(async (docGia) => {
+        const giangVien = await GiangVien.findOne({ MaDocGia: docGia._id })
+          .select("MaCanBo HocVi")
+          .lean();
+        
+        return {
+          _id: docGia._id,
+          HoLot: docGia.HoLot,
+          Ten: docGia.Ten,
+          GiangVien: giangVien
+        };
+      })
+    );
+    
+    // Chỉ trả về những DocGia có thông tin GiangVien
+    return result.filter(item => item.GiangVien !== null);
+  } catch (err) {
+    console.error("Lỗi khi lấy danh sách giảng viên:", err);
+    throw err;
+  }
+}
+
+async function getAllActiveDotNopNienLuan(maDocGia) {
+  try {
+    // Lấy thông tin sinh viên để biết khoa
+    const sinhVien = await SinhVien.findOne({ MaDocGia: maDocGia })
+      .populate({
+        path: 'MaNganhHoc',
+        populate: {
+          path: 'Khoa'
+        }
+      })
+      .lean();
+
+    if (!sinhVien || !sinhVien.MaNganhHoc || !sinhVien.MaNganhHoc.Khoa) {
+      return [];
+    }
+
+    const khoaId = sinhVien.MaNganhHoc.Khoa._id;
+
+    const now = new Date();
+    
+    // Tìm tất cả đợt có TrangThai = 'Đang mở' 
+    // HOẶC (ThoiGianMoNop <= now <= ThoiGianDongNop)
+    const dotNopList = await DotNopNienLuan.find({
+      $or: [
+        { TrangThai: 'Đang mở' },
+        {
+          ThoiGianMoNop: { $lte: now },
+          ThoiGianDongNop: { $gte: now }
+        }
+      ]
+    })
+      .populate('KyHoc', 'TenKyHoc')
+      .populate('NamHoc', 'TenNamHoc')
+      .populate({
+        path: 'MaGiangVien',
+        select: 'HoLot Ten DoiTuong',
+        populate: {
+          path: 'GiangVien',
+          populate: {
+            path: 'MaBoMon',
+            populate: {
+              path: 'MaKhoa'
+            }
+          }
+        }
+      })
+      .sort({ ThoiGianDongNop: 1 }) // Sắp xếp theo hạn nộp gần nhất
+      .lean();
+
+    // Lọc chỉ lấy những đợt có MaGiangVien hợp lệ (là Giảng viên) và cùng khoa với sinh viên
+    const result = dotNopList.filter(dot => {
+      if (!dot.MaGiangVien || dot.MaGiangVien.DoiTuong !== 'Giảng viên') {
+        return false;
+      }
+
+      // Kiểm tra giảng viên có thuộc cùng khoa không
+      const giangVien = dot.MaGiangVien.GiangVien;
+      if (!giangVien || !giangVien.MaBoMon || !giangVien.MaBoMon.MaKhoa) {
+        return false;
+      }
+
+      return giangVien.MaBoMon.MaKhoa._id.toString() === khoaId.toString();
+    });
+
+    return result;
+  } catch (err) {
+    console.error("Lỗi khi lấy danh sách đợt nộp đang mở:", err);
+    throw err;
+  }
+}
+
+async function checkNienLuanSubmission(userId, dotNopId) {
+  try {
+    const nienLuan = await NienLuan.findOne({
+      MaDocGia: userId,
+      MaDotNop: dotNopId,
+      TrangThai: { $in: ['Chờ duyệt', 'Đã duyệt'] }
+    })
+    .populate('MaDotNop')
+    .lean();
+
+    if (!nienLuan) {
+      return { hasSubmitted: false, data: null };
+    }
+
+    return { 
+      hasSubmitted: true, 
+      data: {
+        trangThai: nienLuan.TrangThai,
+        ngayNop: nienLuan.NgayNop,
+        tenDeTai: nienLuan.TenDeTai,
+        dotNop: nienLuan.MaDotNop
+      }
+    };
+  } catch (err) {
+    console.error("Lỗi khi kiểm tra niên luận:", err);
+    throw err;
+  }
+}
+
+// Đếm số lượng niên luận đã nộp trong đợt
+async function countNienLuanByDotNop(dotNopId) {
+  try {
+    return await NienLuan.countDocuments({ 
+      MaDotNop: dotNopId 
+    });
+  } catch (err) {
+    console.error("Lỗi khi đếm niên luận:", err);
+    throw err;
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -2368,5 +2920,19 @@ module.exports = {
   getAllNamHoc,
   getAllKyHoc,
   addKyHoc,
-  addNamHoc
+  addNamHoc,
+  addNienLuan,
+  getOneNienLuan,
+  createDotNopNienLuan,
+  getAllDotNopNienLuan,
+  updateDotNopNienLuan,
+  deleteDotNopNienLuan,
+  getActiveDotNopNienLuan,
+  getAllNienLuanByGiangVien,
+  approveNienLuan,
+  rejectNienLuan,
+  getAllGiangVien,
+  getAllActiveDotNopNienLuan,
+  checkNienLuanSubmission,
+  getAllNienLuanCuaKhoa
 };

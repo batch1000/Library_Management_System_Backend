@@ -284,34 +284,34 @@ function normalizeDate(date) {
       // --- TH1: Còn 2 ngày ---
       if (diffDays === 2) {
         hasLog = true;
-        await notificationService.createNotification({
-          DocGia: borrow.MaDocGia._id,
-          TieuDe: "Nhắc nhở trả sách",
-          NoiDung: `Sách "${borrow.MaSach.TenSach}" còn 2 ngày nữa đến hạn trả.`,
-          LoaiThongBao: "info",
-        });
+        // await notificationService.createNotification({
+        //   DocGia: borrow.MaDocGia._id,
+        //   TieuDe: "Nhắc nhở trả sách",
+        //   NoiDung: `Sách "${borrow.MaSach.TenSach}" còn 2 ngày nữa đến hạn trả.`,
+        //   LoaiThongBao: "info",
+        // });
       }
 
       // --- TH2: Còn 1 ngày ---
       else if (diffDays === 1) {
         hasLog = true;
-        await notificationService.createNotification({
-          DocGia: borrow.MaDocGia._id,
-          TieuDe: "Sắp đến hạn trả sách",
-          NoiDung: `Sách "${borrow.MaSach.TenSach}" sẽ đến hạn trả vào ngày mai.`,
-          LoaiThongBao: "warning",
-        });
+        // await notificationService.createNotification({
+        //   DocGia: borrow.MaDocGia._id,
+        //   TieuDe: "Sắp đến hạn trả sách",
+        //   NoiDung: `Sách "${borrow.MaSach.TenSach}" sẽ đến hạn trả vào ngày mai.`,
+        //   LoaiThongBao: "warning",
+        // });
       }
 
       // --- TH3: Hôm nay phải trả ---
       else if (diffDays === 0) {
         hasLog = true;
-        await notificationService.createNotification({
-          DocGia: borrow.MaDocGia._id,
-          TieuDe: "Hôm nay là hạn trả sách",
-          NoiDung: `Hôm nay là hạn trả sách "${borrow.MaSach.TenSach}". Vui lòng hoàn trả đúng hạn để tránh phát sinh phí.`,
-          LoaiThongBao: "warning",
-        });
+        // await notificationService.createNotification({
+        //   DocGia: borrow.MaDocGia._id,
+        //   TieuDe: "Hôm nay là hạn trả sách",
+        //   NoiDung: `Hôm nay là hạn trả sách "${borrow.MaSach.TenSach}". Vui lòng hoàn trả đúng hạn để tránh phát sinh phí.`,
+        //   LoaiThongBao: "warning",
+        // });
       }
 
       // --- TH4: Đã quá hạn ---
@@ -749,6 +749,45 @@ function normalizeDate(date) {
     }
   } catch (err) {
     console.error("❌ Lỗi khi kiểm tra tự động đóng đợt nộp:", err);
+  }
+})();
+
+
+// Auto check đóng đợt nộp niên luận
+const DotNopNienLuan = require("./app/models/dotnopnienluanModel");
+
+function normalizeDate(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+(async () => {
+  try {
+    const today = normalizeDate(new Date());
+
+    // Lấy tất cả đợt nộp có trạng thái khác "Đã đóng"
+    const dots = await DotNopNienLuan.find({ TrangThai: { $ne: "Đã đóng" } });
+
+    let hasClosed = false;
+
+    for (const dot of dots) {
+      const thoiGianDong = normalizeDate(dot.ThoiGianDongNop);
+
+      if (today > thoiGianDong) {
+        dot.TrangThai = "Đã đóng";
+        await dot.save();
+
+        console.log(
+          `Đợt nộp niên luận "${dot.TenDot}" đã được cập nhật sang trạng thái "Đã đóng".`
+        );
+        hasClosed = true;
+      }
+    }
+
+    if (!hasClosed) {
+      console.log("✅ Không có đợt nộp niên luận nào cần đóng hôm nay.");
+    }
+  } catch (err) {
+    console.error("❌ Lỗi khi kiểm tra tự động đóng đợt nộp niên luận:", err);
   }
 })();
 
