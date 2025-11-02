@@ -119,7 +119,7 @@ async function deleteRoom(req, res) {
 
 async function getAllBookRoomByUserId(req, res) {
   try {
-    const { userId } = req.body; // lấy userId từ body
+    const { userId } = req.body;
 
     if (!userId) {
       return res.status(400).send("Thiếu userId");
@@ -130,7 +130,7 @@ async function getAllBookRoomByUserId(req, res) {
     if (!result || result.length === 0) {
       return res.status(404).send("Không tìm thấy lịch đặt phòng nào");
     }
-    // console.log(JSON.stringify(result, null, 2));
+    
     res.json(result);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách đặt phòng theo userId:", error);
@@ -501,6 +501,23 @@ async function getRoomById(req, res) {
   }
 }
 
+async function getBookingsByRoom(req, res) {
+  try {
+    const { roomId } = req.body;
+
+    if (!roomId) {
+      return res.status(400).send("Thiếu roomId");
+    }
+
+    const result = await roomService.getBookingsByRoom(roomId);
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy booking của phòng:", error);
+    res.status(500).send("Lỗi khi lấy booking của phòng");
+  }
+}
+
+
 module.exports = {
   addRoom,
   getAllRoom,
@@ -522,5 +539,6 @@ module.exports = {
   checkMemberConflict,
   getBookingsAsMember,
   getAvailableSeats,
-  getRoomById
+  getRoomById,
+  getBookingsByRoom
 };

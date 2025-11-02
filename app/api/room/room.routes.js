@@ -22,7 +22,8 @@ const
         checkMemberConflict,
         getBookingsAsMember,
         getAvailableSeats,
-        getRoomById
+        getRoomById,
+        getBookingsByRoom
     } = require('./room.controller')
 
 const router = express.Router();
@@ -53,5 +54,7 @@ router.post("/getBookingsAsMember", getBookingsAsMember)
 
 router.post("/getAvailableSeats", getAvailableSeats)
 router.post('/getRoomById', getRoomById);
+
+router.post('/getBookingsByRoom', getBookingsByRoom);
 
 module.exports = router;
