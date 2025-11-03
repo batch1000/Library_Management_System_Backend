@@ -266,73 +266,116 @@ function normalizeDate(date) {
     const today = normalizeDate(new Date());
     let hasLog = false;
 
-    // Lấy tất cả lượt mượn đang ở trạng thái "approved"
     const approvedBorrows = await TheoDoiMuonSach.find({
       TrangThai: "approved",
-      NgayTra: { $ne: null }, // có ngày trả
+      NgayTra: { $ne: null },
     })
       .populate("MaSach", "TenSach")
       .populate("MaDocGia", "_id HoTen");
 
     for (const borrow of approvedBorrows) {
       const ngayTra = normalizeDate(borrow.NgayTra);
-
       const diffDays = Math.floor(
         (ngayTra.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
       );
 
       // --- TH1: Còn 2 ngày ---
       if (diffDays === 2) {
-        hasLog = true;
-        // await notificationService.createNotification({
-        //   DocGia: borrow.MaDocGia._id,
-        //   TieuDe: "Nhắc nhở trả sách",
-        //   NoiDung: `Sách "${borrow.MaSach.TenSach}" còn 2 ngày nữa đến hạn trả.`,
-        //   LoaiThongBao: "info",
-        // });
+        // Kiểm tra xem hôm nay đã gửi thông báo chưa
+        const daGuiHomNay =
+          borrow.ThongBaoNhacTra2Ngay &&
+          normalizeDate(borrow.ThongBaoNhacTra2Ngay).getTime() ===
+            today.getTime();
+
+        if (!daGuiHomNay) {
+          hasLog = true;
+          await notificationService.createNotification({
+            DocGia: borrow.MaDocGia._id,
+            TieuDe: "Nhắc nhở trả sách",
+            NoiDung: `Sách "${borrow.MaSach.TenSach}" còn 2 ngày nữa đến hạn trả.`,
+            LoaiThongBao: "info",
+          });
+
+          // Cập nhật trạng thái đã gửi
+          borrow.ThongBaoNhacTra2Ngay = today;
+          await borrow.save();
+          console.log(
+            `Đã gửi thông báo 2 ngày cho sách: ${borrow.MaSach.TenSach}`
+          );
+        }
       }
 
       // --- TH2: Còn 1 ngày ---
       else if (diffDays === 1) {
-        hasLog = true;
-        // await notificationService.createNotification({
-        //   DocGia: borrow.MaDocGia._id,
-        //   TieuDe: "Sắp đến hạn trả sách",
-        //   NoiDung: `Sách "${borrow.MaSach.TenSach}" sẽ đến hạn trả vào ngày mai.`,
-        //   LoaiThongBao: "warning",
-        // });
+        const daGuiHomNay =
+          borrow.ThongBaoNhacTra1Ngay &&
+          normalizeDate(borrow.ThongBaoNhacTra1Ngay).getTime() ===
+            today.getTime();
+
+        if (!daGuiHomNay) {
+          hasLog = true;
+          await notificationService.createNotification({
+            DocGia: borrow.MaDocGia._id,
+            TieuDe: "Sắp đến hạn trả sách",
+            NoiDung: `Sách "${borrow.MaSach.TenSach}" sẽ đến hạn trả vào ngày mai.`,
+            LoaiThongBao: "warning",
+          });
+
+          borrow.ThongBaoNhacTra1Ngay = today;
+          await borrow.save();
+          console.log(
+            `Đã gửi thông báo 1 ngày cho sách: ${borrow.MaSach.TenSach}`
+          );
+        }
       }
 
       // --- TH3: Hôm nay phải trả ---
       else if (diffDays === 0) {
-        hasLog = true;
-        // await notificationService.createNotification({
-        //   DocGia: borrow.MaDocGia._id,
-        //   TieuDe: "Hôm nay là hạn trả sách",
-        //   NoiDung: `Hôm nay là hạn trả sách "${borrow.MaSach.TenSach}". Vui lòng hoàn trả đúng hạn để tránh phát sinh phí.`,
-        //   LoaiThongBao: "warning",
-        // });
+        const daGuiHomNay =
+          borrow.ThongBaoNhacTraHomNay &&
+          normalizeDate(borrow.ThongBaoNhacTraHomNay).getTime() ===
+            today.getTime();
+
+        if (!daGuiHomNay) {
+          hasLog = true;
+          await notificationService.createNotification({
+            DocGia: borrow.MaDocGia._id,
+            TieuDe: "Hôm nay là hạn trả sách",
+            NoiDung: `Hôm nay là hạn trả sách "${borrow.MaSach.TenSach}". Vui lòng hoàn trả đúng hạn để tránh phát sinh phí.`,
+            LoaiThongBao: "warning",
+          });
+
+          borrow.ThongBaoNhacTraHomNay = today;
+          await borrow.save();
+          console.log(
+            `Đã gửi thông báo hôm nay cho sách: ${borrow.MaSach.TenSach}`
+          );
+        }
       }
 
       // --- TH4: Đã quá hạn ---
       else if (diffDays < 0) {
         hasLog = true;
+        // Chỉ cập nhật trạng thái nếu chưa phải overdue
+        if (borrow.TrangThai !== "overdue") {
+          borrow.TrangThai = "overdue";
+          borrow.NgayGhiNhanQuaHan = today;
+          await borrow.save();
 
-        // Cập nhật trạng thái sang "overdue"
-        borrow.TrangThai = "overdue";
-        await borrow.save();
-
-        // Gửi thông báo quá hạn
-        await notificationService.createNotification({
-          DocGia: borrow.MaDocGia._id,
-          TieuDe: "Sách mượn đã quá hạn trả",
-          NoiDung: `Sách "${
-            borrow.MaSach.TenSach
-          }" đã quá hạn trả kể từ ngày ${borrow.NgayTra.toLocaleDateString(
-            "vi-VN"
-          )}. Vui lòng hoàn trả sớm.`,
-          LoaiThongBao: "error",
-        });
+          await notificationService.createNotification({
+            DocGia: borrow.MaDocGia._id,
+            TieuDe: "Sách mượn đã quá hạn trả",
+            NoiDung: `Sách "${
+              borrow.MaSach.TenSach
+            }" đã quá hạn trả kể từ ngày ${borrow.NgayTra.toLocaleDateString(
+              "vi-VN"
+            )}. Vui lòng hoàn trả sớm.`,
+            LoaiThongBao: "error",
+          });
+          console.log(
+            `Đã chuyển sang overdue và gửi thông báo cho sách: ${borrow.MaSach.TenSach}`
+          );
+        }
       }
     }
 
@@ -739,7 +782,9 @@ function normalizeDate(date) {
       if (today > thoiGianDong) {
         dot.TrangThai = "Đã đóng";
         await dot.save();
-        console.log(`Đợt nộp "${dot.TenDot}" đã được cập nhật sang trạng thái "Đã đóng".`);
+        console.log(
+          `Đợt nộp "${dot.TenDot}" đã được cập nhật sang trạng thái "Đã đóng".`
+        );
         hasClosed = true;
       }
     }
@@ -751,7 +796,6 @@ function normalizeDate(date) {
     console.error("❌ Lỗi khi kiểm tra tự động đóng đợt nộp:", err);
   }
 })();
-
 
 // Auto check đóng đợt nộp niên luận
 const DotNopNienLuan = require("./app/models/dotnopnienluanModel");

@@ -2030,13 +2030,13 @@ async function getAllThesis() {
         populate: [
           {
             path: "KyHoc",
-            select: "TenKyHoc"
+            select: "TenKyHoc",
           },
           {
-            path: "NamHoc", 
-            select: "TenNamHoc"
-          }
-        ]
+            path: "NamHoc",
+            select: "TenNamHoc",
+          },
+        ],
       })
       .lean();
   } catch (err) {
@@ -2121,14 +2121,14 @@ async function updatePenaltyFee(requestId, adminId, newTotalFee, reason) {
     const updateFields = {
       TongPhiDaSua: newTotalFee,
       LyDoSua: reason.trim(),
-      Msnv: adminId
+      Msnv: adminId,
     };
 
     const updated = await TheoDoiMuonSach.findByIdAndUpdate(
       requestId,
       updateFields,
       { new: true }
-    ).populate('MaDocGia MaSach');
+    ).populate("MaDocGia MaSach");
 
     return updated;
   } catch (err) {
@@ -2137,17 +2137,16 @@ async function updatePenaltyFee(requestId, adminId, newTotalFee, reason) {
   }
 }
 
-
-// 1. Tạo đợt nộp
+// 1. Tạo đợt nộp luận văn
 async function createDotNop(data) {
   try {
     const { ThoiGianMoNop, ThoiGianDongNop } = data;
-    
+
     // Xác định trạng thái dựa trên thời gian hiện tại
     const now = new Date();
     const moNop = new Date(ThoiGianMoNop);
     const dongNop = new Date(ThoiGianDongNop);
-    
+
     let trangThai = "Chưa mở";
     if (now >= moNop && now <= dongNop) {
       trangThai = "Đang mở";
@@ -2161,6 +2160,40 @@ async function createDotNop(data) {
     });
 
     const savedDotNop = await newDotNop.save();
+
+    const populatedDotNop = await DotNopLuanVan.findById(savedDotNop._id)
+      .populate("KyHoc", "TenKyHoc")
+      .populate("NamHoc", "TenNamHoc")
+      .lean();
+
+    // ===== GỬI THÔNG BÁO CHO TOÀN BỘ ĐỘC GIẢ =====
+    if (trangThai === "Đang mở") {
+      const allDocGia = await DocGia.find({}, "_id HoLot Ten DoiTuong");
+      console.log(`Đang gửi thông báo đến ${allDocGia.length} độc giả...`);
+
+      const promises = allDocGia.map((dg) =>
+        notificationService
+          .createNotification({
+            DocGia: dg._id,
+            TieuDe: "Mở đợt nộp luận văn mới",
+            NoiDung: `Đợt "${
+              populatedDotNop.TenDot
+            }" đã được mở từ ngày ${moNop.toLocaleDateString(
+              "vi-VN"
+            )} đến ${dongNop.toLocaleDateString(
+              "vi-VN"
+            )}. Vui lòng truy cập hệ thống để nộp luận văn.`,
+            LoaiThongBao: "info",
+          })
+          .catch((err) => {
+            console.error(`Lỗi gửi thông báo cho ${dg._id}:`, err.message);
+          })
+      );
+
+      await Promise.all(promises);
+      console.log("Hoàn tất gửi thông báo cho tất cả độc giả.");
+    }
+
     return await DotNopLuanVan.findById(savedDotNop._id)
       .populate("KyHoc")
       .populate("NamHoc")
@@ -2192,8 +2225,10 @@ async function updateDotNop(dotNopId, updateData) {
       const dotNop = await DotNopLuanVan.findById(dotNopId);
       const now = new Date();
       const moNop = new Date(updateData.ThoiGianMoNop || dotNop.ThoiGianMoNop);
-      const dongNop = new Date(updateData.ThoiGianDongNop || dotNop.ThoiGianDongNop);
-      
+      const dongNop = new Date(
+        updateData.ThoiGianDongNop || dotNop.ThoiGianDongNop
+      );
+
       if (now >= moNop && now <= dongNop) {
         updateData.TrangThai = "Đang mở";
       } else if (now > dongNop) {
@@ -2227,13 +2262,13 @@ async function deleteDotNop(dotNopId) {
   try {
     // Kiểm tra xem có luận văn nào thuộc đợt này không
     const thesisCount = await LuanVan.countDocuments({ MaDotNop: dotNopId });
-    
+
     if (thesisCount > 0) {
       throw new Error("Không thể xóa đợt nộp đã có luận văn");
     }
 
     const deleted = await DotNopLuanVan.findByIdAndDelete(dotNopId);
-    
+
     if (!deleted) {
       throw new Error("Không tìm thấy đợt nộp");
     }
@@ -2283,7 +2318,7 @@ async function getAllKyHoc() {
 async function addKyHoc(TenKyHoc) {
   try {
     const newKyHoc = new KyHoc({
-      TenKyHoc: TenKyHoc
+      TenKyHoc: TenKyHoc,
     });
 
     const saved = await newKyHoc.save();
@@ -2298,7 +2333,7 @@ async function addKyHoc(TenKyHoc) {
 async function addNamHoc(TenNamHoc) {
   try {
     const newNamHoc = new NamHoc({
-      TenNamHoc: TenNamHoc
+      TenNamHoc: TenNamHoc,
     });
 
     const saved = await newNamHoc.save();
@@ -2309,7 +2344,6 @@ async function addNamHoc(TenNamHoc) {
   }
 }
 
-
 // ==================== SERVICES NIÊN LUẬN ====================
 
 // 1. Sinh viên nộp niên luận
@@ -2317,12 +2351,12 @@ async function addNienLuan(data) {
   try {
     const newNienLuan = new NienLuan({
       TenDeTai: data.TenDeTai,
-      MaDocGia: data.MaDocGia,  // ✅ Đúng với controller & model
+      MaDocGia: data.MaDocGia, // ✅ Đúng với controller & model
       Pdf: data.Pdf,
       Image: data.Image,
       MaDotNop: data.MaDotNop,
       TrangThai: data.TrangThai || "Chờ duyệt", // ✅ Thêm fallback
-      NgayNop: data.NgayNop || new Date()       // ✅ Thêm fallback
+      NgayNop: data.NgayNop || new Date(), // ✅ Thêm fallback
     });
 
     const savedNienLuan = await newNienLuan.save();
@@ -2340,14 +2374,15 @@ async function getOneNienLuan(userId) {
       .sort({ createdAt: -1 })
       .populate({
         path: "MaDotNop",
-        select: "TenDot ThoiGianMoNop ThoiGianDongNop TrangThai KyHoc NamHoc MaGiangVien",
+        select:
+          "TenDot ThoiGianMoNop ThoiGianDongNop TrangThai KyHoc NamHoc MaGiangVien",
         populate: [
           { path: "KyHoc", select: "TenKyHoc" },
           { path: "NamHoc", select: "TenNamHoc" },
-          { 
+          {
             path: "MaGiangVien",
-            select: "HoLot Ten"
-          }
+            select: "HoLot Ten",
+          },
         ],
       })
       .lean();
@@ -2403,12 +2438,12 @@ async function getAllDotNopNienLuan(maGiangVien) {
     // Đếm số lượng niên luận đã nộp cho từng đợt
     const result = await Promise.all(
       dotNopList.map(async (dot) => {
-        const soLuongDaNop = await NienLuan.countDocuments({ 
-          MaDotNop: dot._id 
+        const soLuongDaNop = await NienLuan.countDocuments({
+          MaDotNop: dot._id,
         });
         return {
           ...dot,
-          soLuongDaNop
+          soLuongDaNop,
         };
       })
     );
@@ -2427,7 +2462,9 @@ async function updateDotNopNienLuan(dotNopId, updateData) {
       const dotNop = await DotNopNienLuan.findById(dotNopId);
       const now = new Date();
       const moNop = new Date(updateData.ThoiGianMoNop || dotNop.ThoiGianMoNop);
-      const dongNop = new Date(updateData.ThoiGianDongNop || dotNop.ThoiGianDongNop);
+      const dongNop = new Date(
+        updateData.ThoiGianDongNop || dotNop.ThoiGianDongNop
+      );
 
       if (now >= moNop && now <= dongNop) {
         updateData.TrangThai = "Đang mở";
@@ -2438,9 +2475,13 @@ async function updateDotNopNienLuan(dotNopId, updateData) {
       }
     }
 
-    const updated = await DotNopNienLuan.findByIdAndUpdate(dotNopId, updateData, {
-      new: true,
-    })
+    const updated = await DotNopNienLuan.findByIdAndUpdate(
+      dotNopId,
+      updateData,
+      {
+        new: true,
+      }
+    )
       .populate("KyHoc")
       .populate("NamHoc")
       .populate("MaGiangVien", "HoLot Ten")
@@ -2502,7 +2543,7 @@ async function getActiveDotNopNienLuanForStudent(data) {
   try {
     const { maGiangVien } = data;
     const now = new Date();
-    
+
     return await DotNopNienLuan.findOne({
       MaGiangVien: maGiangVien,
       TrangThai: "Đang mở",
@@ -2521,15 +2562,15 @@ async function getActiveDotNopNienLuanForStudent(data) {
 async function getAllNienLuanByGiangVien(maGiangVien) {
   try {
     // Lấy tất cả đợt nộp của giảng viên
-    const dotNopList = await DotNopNienLuan.find({ 
-      MaGiangVien: maGiangVien 
+    const dotNopList = await DotNopNienLuan.find({
+      MaGiangVien: maGiangVien,
     }).select("_id");
-    
-    const dotNopIds = dotNopList.map(dot => dot._id);
+
+    const dotNopIds = dotNopList.map((dot) => dot._id);
 
     // Lấy tất cả niên luận thuộc các đợt nộp này
     return await NienLuan.find({
-      MaDotNop: { $in: dotNopIds }
+      MaDotNop: { $in: dotNopIds },
     })
       .populate({
         path: "MaDocGia",
@@ -2573,13 +2614,13 @@ async function getAllNienLuanCuaKhoa(maGiangVien) {
       .lean();
 
     if (!giangVien) {
-      throw new Error("Không tìm thấy giảng viên tương ứng với mã độc giả này.");
+      throw new Error(
+        "Không tìm thấy giảng viên tương ứng với mã độc giả này."
+      );
     }
 
     const khoaId =
-      giangVien &&
-      giangVien.MaBoMon &&
-      giangVien.MaBoMon.MaKhoa
+      giangVien && giangVien.MaBoMon && giangVien.MaBoMon.MaKhoa
         ? giangVien.MaBoMon.MaKhoa
         : null;
 
@@ -2642,8 +2683,7 @@ async function getAllNienLuanCuaKhoa(maGiangVien) {
         khoaId
       ) {
         return (
-          String(item.MaDocGia.SinhVien.MaNganhHoc.Khoa._id) ===
-          String(khoaId)
+          String(item.MaDocGia.SinhVien.MaNganhHoc.Khoa._id) === String(khoaId)
         );
       }
       return false;
@@ -2717,28 +2757,28 @@ async function rejectNienLuan(nienLuanId) {
 async function getAllGiangVien() {
   try {
     // Tìm tất cả DocGia có DoiTuong là 'Giảng viên'
-    const docGiaList = await DocGia.find({ DoiTuong: 'Giảng viên' })
+    const docGiaList = await DocGia.find({ DoiTuong: "Giảng viên" })
       .select("_id HoLot Ten")
       .lean();
-    
+
     // Populate thông tin GiangVien cho mỗi DocGia
     const result = await Promise.all(
       docGiaList.map(async (docGia) => {
         const giangVien = await GiangVien.findOne({ MaDocGia: docGia._id })
           .select("MaCanBo HocVi")
           .lean();
-        
+
         return {
           _id: docGia._id,
           HoLot: docGia.HoLot,
           Ten: docGia.Ten,
-          GiangVien: giangVien
+          GiangVien: giangVien,
         };
       })
     );
-    
+
     // Chỉ trả về những DocGia có thông tin GiangVien
-    return result.filter(item => item.GiangVien !== null);
+    return result.filter((item) => item.GiangVien !== null);
   } catch (err) {
     console.error("Lỗi khi lấy danh sách giảng viên:", err);
     throw err;
@@ -2750,10 +2790,10 @@ async function getAllActiveDotNopNienLuan(maDocGia) {
     // Lấy thông tin sinh viên để biết khoa
     const sinhVien = await SinhVien.findOne({ MaDocGia: maDocGia })
       .populate({
-        path: 'MaNganhHoc',
+        path: "MaNganhHoc",
         populate: {
-          path: 'Khoa'
-        }
+          path: "Khoa",
+        },
       })
       .lean();
 
@@ -2764,39 +2804,39 @@ async function getAllActiveDotNopNienLuan(maDocGia) {
     const khoaId = sinhVien.MaNganhHoc.Khoa._id;
 
     const now = new Date();
-    
-    // Tìm tất cả đợt có TrangThai = 'Đang mở' 
+
+    // Tìm tất cả đợt có TrangThai = 'Đang mở'
     // HOẶC (ThoiGianMoNop <= now <= ThoiGianDongNop)
     const dotNopList = await DotNopNienLuan.find({
       $or: [
-        { TrangThai: 'Đang mở' },
+        { TrangThai: "Đang mở" },
         {
           ThoiGianMoNop: { $lte: now },
-          ThoiGianDongNop: { $gte: now }
-        }
-      ]
+          ThoiGianDongNop: { $gte: now },
+        },
+      ],
     })
-      .populate('KyHoc', 'TenKyHoc')
-      .populate('NamHoc', 'TenNamHoc')
+      .populate("KyHoc", "TenKyHoc")
+      .populate("NamHoc", "TenNamHoc")
       .populate({
-        path: 'MaGiangVien',
-        select: 'HoLot Ten DoiTuong',
+        path: "MaGiangVien",
+        select: "HoLot Ten DoiTuong",
         populate: {
-          path: 'GiangVien',
+          path: "GiangVien",
           populate: {
-            path: 'MaBoMon',
+            path: "MaBoMon",
             populate: {
-              path: 'MaKhoa'
-            }
-          }
-        }
+              path: "MaKhoa",
+            },
+          },
+        },
       })
       .sort({ ThoiGianDongNop: 1 }) // Sắp xếp theo hạn nộp gần nhất
       .lean();
 
     // Lọc chỉ lấy những đợt có MaGiangVien hợp lệ (là Giảng viên) và cùng khoa với sinh viên
-    const result = dotNopList.filter(dot => {
-      if (!dot.MaGiangVien || dot.MaGiangVien.DoiTuong !== 'Giảng viên') {
+    const result = dotNopList.filter((dot) => {
+      if (!dot.MaGiangVien || dot.MaGiangVien.DoiTuong !== "Giảng viên") {
         return false;
       }
 
@@ -2821,23 +2861,23 @@ async function checkNienLuanSubmission(userId, dotNopId) {
     const nienLuan = await NienLuan.findOne({
       MaDocGia: userId,
       MaDotNop: dotNopId,
-      TrangThai: { $in: ['Chờ duyệt', 'Đã duyệt'] }
+      TrangThai: { $in: ["Chờ duyệt", "Đã duyệt"] },
     })
-    .populate('MaDotNop')
-    .lean();
+      .populate("MaDotNop")
+      .lean();
 
     if (!nienLuan) {
       return { hasSubmitted: false, data: null };
     }
 
-    return { 
-      hasSubmitted: true, 
+    return {
+      hasSubmitted: true,
       data: {
         trangThai: nienLuan.TrangThai,
         ngayNop: nienLuan.NgayNop,
         tenDeTai: nienLuan.TenDeTai,
-        dotNop: nienLuan.MaDotNop
-      }
+        dotNop: nienLuan.MaDotNop,
+      },
     };
   } catch (err) {
     console.error("Lỗi khi kiểm tra niên luận:", err);
@@ -2848,8 +2888,8 @@ async function checkNienLuanSubmission(userId, dotNopId) {
 // Đếm số lượng niên luận đã nộp trong đợt
 async function countNienLuanByDotNop(dotNopId) {
   try {
-    return await NienLuan.countDocuments({ 
-      MaDotNop: dotNopId 
+    return await NienLuan.countDocuments({
+      MaDotNop: dotNopId,
     });
   } catch (err) {
     console.error("Lỗi khi đếm niên luận:", err);
@@ -2934,5 +2974,5 @@ module.exports = {
   getAllGiangVien,
   getAllActiveDotNopNienLuan,
   checkNienLuanSubmission,
-  getAllNienLuanCuaKhoa
+  getAllNienLuanCuaKhoa,
 };
