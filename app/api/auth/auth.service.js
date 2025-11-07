@@ -81,7 +81,7 @@ async function login(data) {
 
     return {
       _id: nv._id,
-      role: "Admin",
+      role: nv.ChucVu === "Thủ Thư" ? "Admin" : nv.ChucVu === "Quản Lý" ? "Manager" : "Staff",
       hoTen: nv.HoTenNV
     };
   }

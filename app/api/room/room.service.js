@@ -1215,6 +1215,35 @@ async function getBookingsByRoom(roomId) {
   }
 }
 
+async function getStatisticRoom() {
+  try {
+    // Lấy toàn bộ danh sách đặt phòng, kèm đầy đủ thông tin populate
+    const result = await TheoDoiDatPhong.find()
+      .populate({
+        path: "PhongHoc",
+        select: "MaPhong TenPhong LoaiPhong SucChua ViTri TienIch ChoNgoi",
+        populate: {
+          path: "ViTri", // nếu bạn có model ViTriPhong
+          select: "TenViTri ToaNha Tang",
+        },
+      })
+      .populate({
+        path: "DocGia",
+        select: "MaDocGia HoLot Ten DoiTuong",
+      })
+      .populate({
+        path: "ThanhVien.DocGia",
+        select: "MaDocGia HoLot Ten DoiTuong",
+      })
+      .lean(); // trả về plain object thay vì mongoose document
+
+    return result;
+  } catch (err) {
+    console.error("Lỗi khi lấy thống kê đặt phòng:", err);
+    throw err;
+  }
+}
+
 module.exports = {
   addRoom,
   getAllRoom,
@@ -1237,5 +1266,6 @@ module.exports = {
   getBookingsAsMember,
   getAvailableSeats,
   getRoomById,
-  getBookingsByRoom
+  getBookingsByRoom,
+  getStatisticRoom
 };

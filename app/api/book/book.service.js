@@ -21,6 +21,10 @@ const DotNopNienLuan = require("../../models/dotnopnienluanModel");
 const GiangVien = require("../../models/giangvienModel");
 const BoMon = require("../../models/bomonModel");
 
+const BaoCaoThongKe = require("../../models/baocaothongkeModel");
+const NhanVien = require("../../models/nhanvienModel");
+
+
 const notificationService = require("../notification/notification.service");
 
 const {
@@ -2897,6 +2901,147 @@ async function countNienLuanByDotNop(dotNopId) {
   }
 }
 
+//Statistic
+async function getStatisticBook() {
+  try {
+    // Lấy toàn bộ dữ liệu mượn sách, populate đủ thông tin cần thiết
+    const result = await TheoDoiMuonSach.find()
+      .populate({
+        path: "MaSach",
+        select: "MaSach TenSach DonGia SoQuyen NamXuatBan TacGia Image MaTheLoai LoaiSach Khoa", // thêm Khoa
+        populate: [
+          {
+            path: "MaTheLoai",
+            select: "TenTheLoai",
+          },
+          {
+            path: "Khoa",
+            select: "TenKhoa",
+          },
+        ],
+      })
+      .populate({
+        path: "MaDocGia",
+        select: "MaDocGia HoLot Ten",
+      })
+      .populate({
+        path: "Msnv",
+        select: "HoTen MaNhanVien",
+      })
+      .lean();
+
+    return result;
+  } catch (err) {
+    console.error("Lỗi khi lấy danh sách thống kê mượn sách:", err);
+    throw err;
+  }
+}
+
+
+//Report Statistic
+async function submitFilePdfReportStatistic(data) {
+  try {
+    // Kiểm tra nhân viên tồn tại
+    const nhanVien = await NhanVien.findById(data.NguoiNop).exec();
+    if (!nhanVien) {
+      throw new Error("Không tìm thấy nhân viên nộp báo cáo");
+    }
+
+    // Tạo mới báo cáo
+    const newReport = new BaoCaoThongKe({
+      TieuDe: data.TieuDe,
+      NguoiNop: nhanVien._id,
+      LoaiBaoCao: data.LoaiBaoCao,
+      TepDinhKem: data.TepDinhKem,
+      TrangThai: "Đã nộp",
+    });
+
+    const savedReport = await newReport.save();
+    return savedReport;
+  } catch (err) {
+    console.error("Lỗi khi lưu báo cáo:", err);
+    throw err;
+  }
+}
+
+async function submitFileExcelReportStatistic(data) { 
+  try { 
+    // Kiểm tra nhân viên tồn tại 
+    const nhanVien = await NhanVien.findById(data.NguoiNop).exec(); 
+    if (!nhanVien) { 
+      throw new Error("Không tìm thấy nhân viên nộp báo cáo"); 
+    } 
+ 
+    // Tạo mới báo cáo (logic giống PDF)
+    const newReport = new BaoCaoThongKe({ 
+      TieuDe: data.TieuDe, 
+      NguoiNop: nhanVien._id, 
+      LoaiBaoCao: data.LoaiBaoCao, 
+      TepDinhKem: data.TepDinhKem, 
+      TrangThai: "Đã nộp", 
+    }); 
+ 
+    const savedReport = await newReport.save(); 
+    return savedReport; 
+  } catch (err) { 
+    console.error("Lỗi khi lưu báo cáo Excel:", err); 
+    throw err; 
+  } 
+}
+
+async function getReportStatisticByReporter(NguoiNop) {
+  try {
+    // Kiểm tra nhân viên có tồn tại không
+    const nhanVien = await NhanVien.findById(NguoiNop).exec();
+    if (!nhanVien) {
+      throw new Error("Không tìm thấy nhân viên");
+    }
+
+    // Lấy tất cả báo cáo do nhân viên này nộp
+    const reports = await BaoCaoThongKe.find({ NguoiNop })
+      .populate("NguoiNop", "HoTenNV Msnv ChucVu") // lấy thông tin cơ bản của nhân viên
+      .sort({ createdAt: -1 }) // sắp xếp báo cáo mới nhất lên đầu
+      .exec();
+
+    return reports;
+  } catch (err) {
+    console.error("Lỗi khi truy vấn báo cáo:", err);
+    throw err;
+  }
+}
+
+async function deleteOneReportStatistic(reportId) {
+  try {
+    // Tìm báo cáo theo ID
+    const report = await BaoCaoThongKe.findById(reportId).exec();
+    if (!report) {
+      return null;
+    }
+
+    const deletedReport = await BaoCaoThongKe.findByIdAndDelete(reportId).exec();
+
+    return deletedReport;
+  } catch (err) {
+    console.error("Lỗi khi xóa báo cáo:", err);
+    throw err;
+  }
+}
+
+async function getAllReportStatistic() {
+  try {
+    // Lấy toàn bộ báo cáo, kèm thông tin người nộp
+    const reports = await BaoCaoThongKe.find()
+      .populate("NguoiNop", "HoTenNV Msnv ChucVu") // Lấy thông tin nhân viên nộp
+      .sort({ createdAt: -1 }) // Báo cáo mới nhất lên đầu
+      .exec();
+
+    return reports;
+  } catch (err) {
+    console.error("Lỗi khi truy vấn tất cả báo cáo thống kê:", err);
+    throw err;
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -2975,4 +3120,11 @@ module.exports = {
   getAllActiveDotNopNienLuan,
   checkNienLuanSubmission,
   getAllNienLuanCuaKhoa,
+  getStatisticBook,
+
+  submitFilePdfReportStatistic,
+  submitFileExcelReportStatistic,
+  getReportStatisticByReporter,
+  deleteOneReportStatistic,
+  getAllReportStatistic
 };

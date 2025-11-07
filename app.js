@@ -1690,3 +1690,435 @@ function normalizeDate(date) {
 //         console.error("Lỗi chung khi chạy script:", err.message);
 //     }
 // })();
+
+
+
+
+
+
+
+
+
+
+
+//----------------------Create Room Booking Data-------------------------
+// const PhongHoc = require('./app/models/phonghocModel');
+
+// // Hàm tạo lượt đặt phòng trực tiếp vào database
+// async function createRoomBooking(bookingData) {
+//     const newBooking = new TheoDoiDatPhong(bookingData);
+//     const savedBooking = await newBooking.save();
+//     return savedBooking;
+// }
+
+// // Lấy danh sách độc giả từ database
+// async function getAllReaders() {
+//     try {
+//         const readers = await DocGia.find({}).select('_id MaDocGia HoLot Ten DoiTuong');
+//         console.log(`✅ Đã tải ${readers.length} độc giả từ database`);
+//         return readers;
+//     } catch (error) {
+//         console.error('❌ Lỗi khi tải độc giả:', error.message);
+//         return [];
+//     }
+// }
+
+// // Lấy danh sách phòng học từ database
+// async function getAllRooms() {
+//     try {
+//         const rooms = await PhongHoc.find({}).select('_id MaPhong TenPhong LoaiPhong SucChua ChoNgoi');
+//         console.log(`✅ Đã tải ${rooms.length} phòng học từ database`);
+//         return rooms;
+//     } catch (error) {
+//         console.error('❌ Lỗi khi tải phòng học:', error.message);
+//         return [];
+//     }
+// }
+
+// // Hàm random độc giả (một số active hơn)
+// function getRandomReader(readers) {
+//     const activeCount = Math.floor(readers.length * 0.6); // 60% độc giả active
+//     const activeReaders = readers.slice(0, activeCount);
+//     const normalReaders = readers.slice(activeCount);
+
+//     // 70% cơ hội chọn độc giả active
+//     if (Math.random() < 0.7 && activeReaders.length > 0) {
+//         return activeReaders[Math.floor(Math.random() * activeReaders.length)];
+//     } else if (normalReaders.length > 0) {
+//         return normalReaders[Math.floor(Math.random() * normalReaders.length)];
+//     }
+//     return readers[Math.floor(Math.random() * readers.length)];
+// }
+
+// // Hàm random phòng học
+// function getRandomRoom(rooms) {
+//     return rooms[Math.floor(Math.random() * rooms.length)];
+// }
+
+// // Hàm random trạng thái (phân bố thực tế)
+// function getRandomStatus() {
+//     const rand = Math.random();
+//     if (rand < 0.05) return 'pending';        // 5% chờ duyệt
+//     if (rand < 0.10) return 'waiting_members'; // 5% chờ thành viên
+//     if (rand < 0.50) return 'approved';       // 40% đã duyệt
+//     if (rand < 0.60) return 'checked_in';     // 10% đã nhận phòng
+//     if (rand < 0.75) return 'no_show';        // 15% không nhận phòng
+//     if (rand < 0.85) return 'denied';         // 10% bị từ chối
+//     return 'canceled';                         // 15% đã hủy
+// }
+
+// // Hàm random giờ sử dụng phòng
+// function getRandomTimeSlot() {
+//     const startHours = [7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19];
+//     const startHour = startHours[Math.floor(Math.random() * startHours.length)];
+//     const duration = [1, 2, 3, 4, 5][Math.floor(Math.random() * 5)]; // 1-5 giờ
+    
+//     const endHour = Math.min(startHour + duration, 22);
+    
+//     return {
+//         start: `${String(startHour).padStart(2, '0')}:00`,
+//         end: `${String(endHour).padStart(2, '0')}:00`
+//     };
+// }
+
+// // Hàm random chọn chỗ ngồi
+// function getRandomSeats(room, isGroupRoom) {
+//     const availableSeats = room.ChoNgoi.map(seat => seat.SoCho);
+    
+//     if (!isGroupRoom || availableSeats.length === 0) {
+//         // Phòng cá nhân: chọn 1 chỗ
+//         return [availableSeats[Math.floor(Math.random() * availableSeats.length)] || 1];
+//     }
+    
+//     // Phòng nhóm: chọn 2-5 chỗ
+//     const numSeats = Math.min(
+//         Math.floor(Math.random() * 4) + 2, // 2-5 chỗ
+//         availableSeats.length
+//     );
+    
+//     const shuffled = availableSeats.sort(() => Math.random() - 0.5);
+//     return shuffled.slice(0, numSeats);
+// }
+
+// // Hàm random thành viên cho phòng nhóm
+// function getRandomMembers(readers, mainReader, numMembers) {
+//     const members = [];
+//     const availableReaders = readers.filter(r => r._id.toString() !== mainReader._id.toString());
+    
+//     const shuffled = availableReaders.sort(() => Math.random() - 0.5);
+    
+//     for (let i = 0; i < Math.min(numMembers, shuffled.length); i++) {
+//         const memberStatus = Math.random() < 0.85 ? 'accepted' : 
+//                            Math.random() < 0.5 ? 'invited' : 'declined';
+        
+//         members.push({
+//             DocGia: shuffled[i]._id,
+//             TrangThai: memberStatus
+//         });
+//     }
+    
+//     return members;
+// }
+
+// // Hàm tạo ngày đặt phòng phân bố đều TRONG 1 NĂM
+// function generateYearBookingDates(targetCount) {
+//     const now = new Date();
+//     const oneYearAgo = new Date();
+//     oneYearAgo.setFullYear(now.getFullYear() - 1);
+//     oneYearAgo.setDate(now.getDate());
+
+//     const dates = [];
+//     const totalDays = Math.floor((now - oneYearAgo) / (1000 * 60 * 60 * 24));
+    
+//     console.log(`📅 Tạo dữ liệu từ ${oneYearAgo.toLocaleDateString('vi-VN')} đến ${now.toLocaleDateString('vi-VN')} (${totalDays} ngày)`);
+
+//     // Tạo trọng số cho mỗi tháng (tháng gần có nhiều hơn)
+//     const monthWeights = [];
+//     for (let month = 0; month < 12; month++) {
+//         // Tháng càng gần hiện tại càng có trọng số cao
+//         const weight = 0.6 + (month / 12) * 0.8; // Từ 0.6 đến 1.4
+//         monthWeights.push(weight);
+//     }
+
+//     // Điều chỉnh trọng số theo thứ trong tuần
+//     const adjustWeightByDayOfWeek = (date, weight) => {
+//         const dayOfWeek = date.getDay();
+//         const weekdayMultiplier = {
+//             0: 0.5,  // Chủ nhật - ít nhất
+//             1: 1.0,  // Thứ 2
+//             2: 1.2,  // Thứ 3
+//             3: 1.3,  // Thứ 4 - nhiều nhất
+//             4: 1.2,  // Thứ 5
+//             5: 1.1,  // Thứ 6
+//             6: 0.7   // Thứ 7
+//         };
+//         return weight * weekdayMultiplier[dayOfWeek];
+//     };
+
+//     // Tạo dữ liệu cho từng ngày
+//     for (let day = 0; day < totalDays; day++) {
+//         const currentDate = new Date(oneYearAgo);
+//         currentDate.setDate(oneYearAgo.getDate() + day);
+
+//         // Lấy trọng số của tháng
+//         const monthIndex = Math.floor((day / totalDays) * 12);
+//         let weight = monthWeights[Math.min(monthIndex, 11)];
+        
+//         // Điều chỉnh theo thứ trong tuần
+//         weight = adjustWeightByDayOfWeek(currentDate, weight);
+
+//         // Tính số lượt đặt cho ngày này
+//         const baseCount = targetCount / totalDays * weight;
+//         const randomVariation = (Math.random() - 0.5) * 3;
+//         const dayCount = Math.max(0, Math.round(baseCount + randomVariation));
+
+//         // Tạo các lượt đặt trong ngày
+//         for (let i = 0; i < dayCount; i++) {
+//             const bookingDate = new Date(currentDate);
+            
+//             // Random giờ đặt (thường đặt trước 1-5 ngày)
+//             const daysBeforeUsage = Math.floor(Math.random() * 5) + 1;
+//             bookingDate.setDate(bookingDate.getDate() - daysBeforeUsage);
+            
+//             // Random giờ trong ngày (7h-21h)
+//             const hourRand = Math.random();
+//             let hour;
+//             if (hourRand < 0.15) {
+//                 hour = 7 + Math.floor(Math.random() * 2);  // 7-8h: 15%
+//             } else if (hourRand < 0.35) {
+//                 hour = 9 + Math.floor(Math.random() * 3);  // 9-11h: 20%
+//             } else if (hourRand < 0.45) {
+//                 hour = 12 + Math.floor(Math.random() * 2); // 12-13h: 10%
+//             } else if (hourRand < 0.70) {
+//                 hour = 14 + Math.floor(Math.random() * 4); // 14-17h: 25%
+//             } else {
+//                 hour = 18 + Math.floor(Math.random() * 4); // 18-21h: 30%
+//             }
+
+//             const minute = Math.floor(Math.random() * 60);
+//             bookingDate.setHours(hour, minute, 0, 0);
+            
+//             dates.push({
+//                 bookingDate: bookingDate,
+//                 usageDate: new Date(currentDate)
+//             });
+//         }
+//     }
+
+//     // Shuffle để random hơn
+//     for (let i = dates.length - 1; i > 0; i--) {
+//         const j = Math.floor(Math.random() * (i + 1));
+//         [dates[i], dates[j]] = [dates[j], dates[i]];
+//     }
+
+//     return dates.slice(0, targetCount);
+// }
+
+// // Hàm chính tạo dữ liệu
+// (async () => {
+//     try {
+//         console.log("\n" + "🚀 ".repeat(30));
+//         console.log("       BẮT ĐẦU TẠO DỮ LIỆU ĐẶT PHÒNG HỌC       ");
+//         console.log("🚀 ".repeat(30) + "\n");
+
+//         // Tải dữ liệu từ database
+//         console.log("📥 Đang tải dữ liệu từ database...\n");
+//         const readers = await getAllReaders();
+//         const rooms = await getAllRooms();
+
+//         if (readers.length === 0) {
+//             console.error("❌ Không có độc giả trong database! Vui lòng thêm độc giả trước.");
+//             return;
+//         }
+
+//         if (rooms.length === 0) {
+//             console.error("❌ Không có phòng học trong database! Vui lòng thêm phòng trước.");
+//             return;
+//         }
+
+//         console.log("\n✅ Đã tải thành công:");
+//         console.log(`   📚 ${readers.length} độc giả`);
+//         console.log(`   🏫 ${rooms.length} phòng học`);
+
+//         // Cấu hình - TẠO DỮ LIỆU TRONG 1 NĂM
+//         const TARGET_BOOKING_COUNT = 800; // Tăng lên 800 để phân bố đủ trong 1 năm
+
+//         console.log("\n" + "=".repeat(60));
+//         console.log("⚙️  CẤU HÌNH TẠO DỮ LIỆU");
+//         console.log("=".repeat(60));
+//         console.log(`📊 Số lượt đặt mục tiêu: ${TARGET_BOOKING_COUNT}`);
+//         console.log(`📅 Khoảng thời gian: 1 năm (từ năm ngoái đến nay)`);
+//         console.log(`📈 Phân bố: Tháng gần đây có nhiều hơn tháng cũ`);
+
+//         let successCount = 0;
+//         let errorCount = 0;
+
+//         console.log("\n⏳ Đang tạo phân bố ngày đặt trong 1 năm...");
+//         const bookingDates = generateYearBookingDates(TARGET_BOOKING_COUNT);
+//         console.log(`✅ Đã tạo ${bookingDates.length} khoảng thời gian phân bố\n`);
+
+//         console.log("=".repeat(60));
+//         console.log("💾 BẮT ĐẦU TẠO VÀ LƯU DỮ LIỆU VÀO DATABASE");
+//         console.log("=".repeat(60) + "\n");
+
+//         const startTime = Date.now();
+
+//         for (let i = 0; i < bookingDates.length; i++) {
+//             try {
+//                 const { bookingDate, usageDate } = bookingDates[i];
+//                 const reader = getRandomReader(readers);
+//                 const room = getRandomRoom(rooms);
+//                 const status = getRandomStatus();
+//                 const timeSlot = getRandomTimeSlot();
+                
+//                 const isGroupRoom = room.LoaiPhong === 'Nhóm';
+//                 const selectedSeats = getRandomSeats(room, isGroupRoom);
+                
+//                 // Tạo thành viên nếu là phòng nhóm
+//                 let members = [];
+//                 if (isGroupRoom && selectedSeats.length > 1) {
+//                     members = getRandomMembers(readers, reader, selectedSeats.length - 1);
+//                 }
+
+//                 // Tạo ngày duyệt nếu đã duyệt
+//                 let approvalDate = null;
+//                 if (['approved', 'checked_in', 'no_show', 'denied'].includes(status)) {
+//                     approvalDate = new Date(bookingDate);
+//                     const hoursToAdd = Math.floor(Math.random() * 48) + 1; // 1-48 giờ sau
+//                     approvalDate.setHours(bookingDate.getHours() + hoursToAdd);
+//                 }
+
+//                 const bookingData = {
+//                     NgayDat: bookingDate,
+//                     NgaySuDung: usageDate,
+//                     NgayDuyet: approvalDate,
+//                     GioBatDau: timeSlot.start,
+//                     GioKetThuc: timeSlot.end,
+//                     TrangThai: status,
+//                     PhongHoc: room._id,
+//                     DocGia: reader._id,
+//                     ThanhVien: members,
+//                     ChoNgoiDaChon: selectedSeats
+//                 };
+
+//                 const result = await createRoomBooking(bookingData);
+
+//                 if (result) {
+//                     successCount++;
+                    
+//                     if (successCount % 50 === 0) {
+//                         const progress = ((successCount / bookingDates.length) * 100).toFixed(1);
+//                         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+//                         console.log(`[${successCount}/${bookingDates.length}] Tiến độ: ${progress}% - Thời gian: ${elapsed}s`);
+//                     }
+//                 }
+
+//                 // Delay nhỏ để tránh quá tải database
+//                 if (i % 30 === 0 && i > 0) {
+//                     await new Promise(resolve => setTimeout(resolve, 30));
+//                 }
+
+//             } catch (error) {
+//                 errorCount++;
+//                 if (errorCount <= 3) {
+//                     console.log(`❌ Lỗi [${errorCount}]: ${error.message}`);
+//                 }
+//             }
+//         }
+
+//         const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+
+//         // Kết quả chi tiết
+//         console.log("\n" + "=".repeat(60));
+//         console.log("📊 KẾT QUẢ TẠO DỮ LIỆU");
+//         console.log("=".repeat(60));
+//         console.log(`✅ Thành công: ${successCount} lượt đặt`);
+//         console.log(`❌ Lỗi: ${errorCount} lượt`);
+//         console.log(`⏱️  Thời gian: ${totalTime}s`);
+//         console.log(`📈 Tỷ lệ thành công: ${((successCount / (successCount + errorCount)) * 100).toFixed(1)}%`);
+
+//         console.log("\n" + "=".repeat(60));
+//         console.log("📈 THỐNG KÊ CHI TIẾT");
+//         console.log("=".repeat(60));
+//         console.log(`📚 Trung bình mỗi phòng: ~${(successCount / rooms.length).toFixed(1)} lượt đặt`);
+//         console.log(`👥 Trung bình mỗi độc giả: ~${(successCount / readers.length).toFixed(1)} lượt đặt`);
+//         console.log(`📅 Trung bình mỗi ngày: ~${(successCount / 365).toFixed(1)} lượt đặt`);
+//         console.log(`📅 Trung bình mỗi tuần: ~${(successCount / 52).toFixed(1)} lượt đặt`);
+//         console.log(`📅 Trung bình mỗi tháng: ~${(successCount / 12).toFixed(1)} lượt đặt`);
+//         console.log(`📅 Trung bình mỗi quý: ~${(successCount / 4).toFixed(1)} lượt đặt`);
+
+//         console.log("\n📅 PHÂN BỐ THỜI GIAN:");
+//         console.log(`   ✓ Dữ liệu trong 1 năm (365 ngày)`);
+//         console.log(`   ✓ Tháng gần đây có nhiều lượt hơn tháng cũ`);
+//         console.log(`   ✓ Thứ 4 có nhiều nhất, Chủ nhật ít nhất`);
+//         console.log(`   ✓ Giờ cao điểm: 14h-18h (25%) và 18h-22h (30%)`);
+
+//         console.log("\n🎯 PHÂN BỐ TRẠNG THÁI:");
+//         console.log(`   ✓ 40% Đã duyệt`);
+//         console.log(`   ✓ 15% Không nhận phòng`);
+//         console.log(`   ✓ 15% Đã hủy`);
+//         console.log(`   ✓ 10% Đã nhận phòng`);
+//         console.log(`   ✓ 10% Bị từ chối`);
+//         console.log(`   ✓ 5% Chờ duyệt`);
+//         console.log(`   ✓ 5% Chờ thành viên`);
+
+//         console.log("\n👥 PHÂN TÍCH HÀNH VI:");
+//         console.log(`   ✓ 70% lượt đặt từ độc giả tích cực`);
+//         console.log(`   ✓ Random đều trên tất cả phòng`);
+//         console.log(`   ✓ Phòng nhóm có 2-5 chỗ ngồi được chọn`);
+//         console.log(`   ✓ Đặt trước 1-5 ngày trước ngày sử dụng`);
+
+//         console.log("\n" + "✨ ".repeat(30));
+//         console.log("           HOÀN THÀNH TẠO DỮ LIỆU!           ");
+//         console.log("✨ ".repeat(30) + "\n");
+
+//         console.log("💡 GỢI Ý:");
+//         console.log("   - Bây giờ bạn có thể xem thống kê theo ngày/tuần/tháng/quý/năm");
+//         console.log("   - Dữ liệu phân bố đều trong 12 tháng qua");
+//         console.log("   - Nếu muốn xóa, chạy phần script xóa bên dưới\n");
+
+//     } catch (err) {
+//         console.error("\n❌ LỖI CHUNG KHI CHẠY SCRIPT:", err.message);
+//         console.error(err.stack);
+//     }
+// })();
+
+
+//=============================================================================
+//                     SCRIPT XÓA DỮ LIỆU ĐẶT PHÒNG
+//=============================================================================
+// async function deleteAllRoomBookings() {
+//     try {
+//         console.log("\n" + "=".repeat(60));
+//         console.log("⚠️  XÓA TẤT CẢ DỮ LIỆU ĐẶT PHÒNG");
+//         console.log("=".repeat(60) + "\n");
+
+//         // Đếm trước khi xóa
+//         const countBefore = await TheoDoiDatPhong.countDocuments();
+//         console.log(`📊 Số lượng hiện tại: ${countBefore} lượt đặt\n`);
+
+//         if (countBefore === 0) {
+//             console.log("✅ Database đã trống, không cần xóa.\n");
+//             return 0;
+//         }
+
+//         console.log("⏳ Đang xóa...");
+//         const result = await TheoDoiDatPhong.deleteMany({});
+        
+//         console.log("\n" + "=".repeat(60));
+//         console.log(`✅ ĐÃ XÓA THÀNH CÔNG ${result.deletedCount} LƯỢT ĐẶT PHÒNG`);
+//         console.log("=".repeat(60) + "\n");
+        
+//         return result.deletedCount;
+//     } catch (error) {
+//         console.error("❌ Lỗi khi xóa dữ liệu:", error.message);
+//         throw error;
+//     }
+// }
+// (async () => {
+//     try {
+//         await deleteAllRoomBookings();
+//     } catch (err) {
+//         console.error("\n❌ LỖI:", err.message);
+//     }
+// })();

@@ -1,5 +1,6 @@
 const express = require("express");
 const upload = require("../../config/multer");
+const uploadExcel = require('../../config/multerExcel');
 const {
   addGenre,
   getAllGenre,
@@ -78,7 +79,14 @@ const {
   getAllGiangVien,
   getAllActiveDotNopNienLuan,
   checkNienLuanSubmission,
-  getAllNienLuanCuaKhoa
+  getAllNienLuanCuaKhoa,
+  getStatisticBook,
+
+  submitFilePdfReportStatistic,
+  submitFileExcelReportStatistic,
+  getReportStatisticByReporter,
+  deleteOneReportStatistic,
+  getAllReportStatistic
 } = require("./book.controller");
 
 const router = express.Router();
@@ -221,5 +229,18 @@ router.post("/rejectNienLuan", rejectNienLuan);
 router.get("/getAllGiangVien", getAllGiangVien);
 router.get("/getAllActiveDotNopNienLuan/:maDocGia", getAllActiveDotNopNienLuan);
 router.get("/checkNienLuanSubmission/:userId/:dotNopId", checkNienLuanSubmission);
+
+
+//Statistic
+router.get("/getStatisticBook", getStatisticBook);
+
+
+
+//Report Statistic
+router.post("/submitFilePdfReportStatistic", upload.single('file'), submitFilePdfReportStatistic);
+router.post("/submitFileExcelReportStatistic", uploadExcel.single('file'), submitFileExcelReportStatistic);
+router.post("/getReportStatisticByReporter", getReportStatisticByReporter);
+router.delete("/deleteOneReportStatistic", deleteOneReportStatistic);
+router.get("/getAllReportStatistic", getAllReportStatistic);
 
 module.exports = router;

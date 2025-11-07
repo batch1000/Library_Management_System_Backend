@@ -517,6 +517,16 @@ async function getBookingsByRoom(req, res) {
   }
 }
 
+async function getStatisticRoom(req, res) {
+  try {
+    const result = await roomService.getStatisticRoom();
+    // console.log(JSON.stringify(result.slice(-3), null, 2));
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy thống kê phòng:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy thống kê phòng" });
+  }
+}
 
 module.exports = {
   addRoom,
@@ -540,5 +550,6 @@ module.exports = {
   getBookingsAsMember,
   getAvailableSeats,
   getRoomById,
-  getBookingsByRoom
+  getBookingsByRoom,
+  getStatisticRoom
 };

@@ -23,7 +23,8 @@ const
         getBookingsAsMember,
         getAvailableSeats,
         getRoomById,
-        getBookingsByRoom
+        getBookingsByRoom,
+        getStatisticRoom
     } = require('./room.controller')
 
 const router = express.Router();
@@ -56,5 +57,7 @@ router.post("/getAvailableSeats", getAvailableSeats)
 router.post('/getRoomById', getRoomById);
 
 router.post('/getBookingsByRoom', getBookingsByRoom);
+
+router.get("/getStatisticRoom", getStatisticRoom)
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const bookService = require("./book.service");
 const {
   uploadToCloudinary,
+  uploadExcelToCloudinary,
   deleteImageFromCloudinary,
 } = require("../../services/cloudinary.service");
 
@@ -1630,6 +1631,187 @@ async function checkNienLuanSubmission(req, res) {
   }
 }
 
+//Statistic
+async function getStatisticBook(req, res) {
+  try {
+    const result = await bookService.getStatisticBook();
+    // console.log(JSON.stringify(result.slice(-3), null, 2));
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy thống kê sách:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy thống kê sách" });
+  }
+}
+
+
+//Report Statistic
+async function submitFilePdfReportStatistic(req, res) {
+  try {
+    const body = req.body;
+    const file = req.file;
+
+    // Kiểm tra file bắt buộc
+    if (!file) {
+      return res.status(400).send("Vui lòng chọn file báo cáo (PDF)");
+    }
+
+    // Kiểm tra loại báo cáo
+    if (!body.LoaiBaoCao) {
+      return res.status(400).send("Vui lòng chọn loại báo cáo (Ngày, Tuần, Tháng, Quý, Năm)");
+    }
+
+    // Upload file PDF lên Cloudinary
+    const uploadResult = await uploadToCloudinary(file.buffer);
+    if (!uploadResult) {
+      console.log("Lỗi khi upload báo cáo PDF lên cloud");
+      return res.status(500).send("Lỗi khi upload báo cáo PDF");
+    }
+
+    // Chuẩn bị dữ liệu báo cáo
+    const reportData = {
+      TieuDe: body.TieuDe,
+      NguoiNop: body.NguoiNop, // ID nhân viên nộp báo cáo
+      LoaiBaoCao: body.LoaiBaoCao,
+      TepDinhKem: uploadResult.secure_url,
+    };
+
+    // Gọi service để lưu DB
+    const result = await bookService.submitFilePdfReportStatistic(reportData);
+
+    res.json(result);
+    console.log("Nộp báo cáo thành công:", result._id);
+  } catch (error) {
+    console.error("Lỗi khi nộp báo cáo:", error);
+    res.status(500).send("Nộp báo cáo thất bại");
+  }
+}
+
+async function submitFileExcelReportStatistic(req, res) { 
+  try { 
+    const body = req.body; 
+    const file = req.file; 
+ 
+    // Kiểm tra file bắt buộc 
+    if (!file) { 
+      return res.status(400).send("Vui lòng chọn file báo cáo (Excel)"); 
+    } 
+ 
+    // Kiểm tra loại báo cáo 
+    if (!body.LoaiBaoCao) { 
+      return res.status(400).send("Vui lòng chọn loại báo cáo (Ngày, Tuần, Tháng, Quý, Năm)"); 
+    } 
+ 
+    // Đọc file từ disk vào buffer
+    const fs = require('fs');
+    const fileBuffer = fs.readFileSync(file.path);
+    
+    // Upload file Excel lên Cloudinary 
+    const uploadResult = await uploadExcelToCloudinary(fileBuffer, file.originalname);
+    if (!uploadResult) { 
+      console.log("Lỗi khi upload báo cáo Excel lên cloud"); 
+      // Xóa file tạm
+      fs.unlinkSync(file.path);
+      return res.status(500).send("Lỗi khi upload báo cáo Excel"); 
+    } 
+ 
+    // Xóa file tạm sau khi upload thành công
+    fs.unlinkSync(file.path);
+ 
+    // Chuẩn bị dữ liệu báo cáo 
+    const reportData = { 
+      TieuDe: body.TieuDe, 
+      NguoiNop: body.NguoiNop, 
+      LoaiBaoCao: body.LoaiBaoCao, 
+      TepDinhKem: uploadResult.secure_url, 
+    }; 
+ 
+    // Gọi service để lưu DB (có thể dùng chung service với PDF)
+    const result = await bookService.submitFileExcelReportStatistic(reportData); 
+ 
+    res.json(result); 
+    console.log("Nộp báo cáo Excel thành công:", result._id); 
+  } catch (error) { 
+    console.error("Lỗi khi nộp báo cáo Excel:", error);
+    
+    // Xóa file tạm nếu có lỗi
+    if (req.file && req.file.path) {
+      const fs = require('fs');
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error("Lỗi khi xóa file tạm:", unlinkError);
+      }
+    }
+    
+    res.status(500).send("Nộp báo cáo thất bại"); 
+  } 
+}
+
+async function getReportStatisticByReporter(req, res) {
+  try {
+    const { NguoiNop } = req.body;
+
+    // Kiểm tra đầu vào
+    if (!NguoiNop) {
+      return res.status(400).send("Thiếu thông tin người nộp báo cáo (NguoiNop)");
+    }
+
+    // Gọi service để lấy dữ liệu
+    const reports = await bookService.getReportStatisticByReporter(NguoiNop);
+
+    if (!reports || reports.length === 0) {
+      return res.status(404).send("Không tìm thấy báo cáo nào của nhân viên này");
+    }
+
+    res.json(reports);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách báo cáo:", error);
+    res.status(500).send("Không thể lấy danh sách báo cáo");
+  }
+}
+
+async function deleteOneReportStatistic(req, res) {
+  try {
+    const { reportId } = req.body;
+
+    // Kiểm tra đầu vào
+    if (!reportId) {
+      return res.status(400).send("Thiếu ID của báo cáo cần xóa (reportId)");
+    }
+
+    // Gọi service để xóa báo cáo
+    const deletedReport = await bookService.deleteOneReportStatistic(reportId);
+
+    if (!deletedReport) {
+      return res.status(404).send("Không tìm thấy báo cáo cần xóa");
+    }
+
+    res.json({
+      message: "Xóa báo cáo thành công",
+      deletedReport,
+    });
+  } catch (error) {
+    console.error("Lỗi khi xóa báo cáo:", error);
+    res.status(500).send("Xóa báo cáo thất bại");
+  }
+}
+
+async function getAllReportStatistic(req, res) {
+  try {
+    // Gọi service để lấy toàn bộ báo cáo
+    const reports = await bookService.getAllReportStatistic();
+
+    if (!reports || reports.length === 0) {
+      return res.status(404).send("Không có báo cáo thống kê nào trong hệ thống");
+    }
+    // console.log(reports);
+    res.json(reports);
+  } catch (error) {
+    console.error("Lỗi khi lấy tất cả báo cáo thống kê:", error);
+    res.status(500).send("Không thể lấy danh sách báo cáo thống kê");
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -1708,5 +1890,12 @@ module.exports = {
   getAllGiangVien,
   getAllActiveDotNopNienLuan,
   checkNienLuanSubmission,
-  getAllNienLuanCuaKhoa
+  getAllNienLuanCuaKhoa,
+  getStatisticBook,
+
+  submitFilePdfReportStatistic,
+  submitFileExcelReportStatistic,
+  getReportStatisticByReporter,
+  deleteOneReportStatistic,
+  getAllReportStatistic
 };

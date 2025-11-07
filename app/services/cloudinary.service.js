@@ -33,6 +33,32 @@ async function uploadToCloudinary(buffer) {
   });
 }
 
+async function uploadExcelToCloudinary(buffer, originalFilename) { 
+  return new Promise((resolve, reject) => { 
+    const options = { 
+      resource_type: "raw", // Excel phải dùng "raw"
+      folder: "excels", 
+      public_id: `excel_${Date.now()}`, // Đặt tên file
+      access_mode: "public",
+      // Giữ nguyên extension gốc
+      format: originalFilename.split('.').pop(),
+    }; 
+ 
+    const stream = cloudinary.uploader.upload_stream( 
+      options, 
+      (error, result) => { 
+        if (error) {
+          console.error("Cloudinary upload error:", error);
+          return reject(error);
+        }
+        resolve(result); 
+      } 
+    ); 
+ 
+    stream.end(buffer); 
+  }); 
+}
+
 async function deleteImageFromCloudinary(publicId) {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.destroy(
@@ -48,4 +74,5 @@ async function deleteImageFromCloudinary(publicId) {
 module.exports = {
   uploadToCloudinary,
   deleteImageFromCloudinary,
+  uploadExcelToCloudinary
 };
