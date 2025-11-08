@@ -2122,3 +2122,25 @@ function normalizeDate(date) {
 //         console.error("\n❌ LỖI:", err.message);
 //     }
 // })();
+
+
+//Test gửi mail
+// const { emailSender } = require("./app/services/email.service");
+// (async () => {
+//   try {
+//     await emailSender({
+//       email: "learncode10002003@gmail.com",
+//       subject: "Test gửi mail từ Node.js",
+//       html: `
+//         <h3>Xin chào!</h3>
+//         <p>Đây là email test gửi tự động bằng <b>Nodemailer</b>.</p>
+//         <p>Thời gian gửi: ${new Date().toLocaleString("vi-VN")}</p>
+//       `,
+//     });
+
+//     console.log("✅ Test hoàn tất");
+//   } catch (err) {
+//     console.error("❌ Lỗi test gửi mail:", err);
+//   }
+// })();
+
