@@ -2144,3 +2144,37 @@ function normalizeDate(date) {
 //   }
 // })();
 
+
+
+// const axios = require("axios");
+
+// const a = "Học lập trình giúp tôi phát triển tư duy logic.";
+// const b = "Việc lập trình giúp rèn luyện khả năng suy nghĩ theo logic.";
+
+// axios.post("https://kerchieft-crescentic-lavon.ngrok-free.dev/chatbot", { a, b })
+//   .then(res => console.log("Similarity từ Colab:", res.data.similarity))
+//   .catch(err => console.error(err));
+
+
+
+// const chatbotService = require("./chatbotData");
+// async function testSendDatabaseToChatBot() {
+//   try {
+//     const allData = await chatbotService.sendDatabaseToChatBot();
+
+//     // In ra tổng số collection đã lấy được
+//     console.log("✅ Số lượng collection:", Object.keys(allData).length);
+//     console.log("📂 Danh sách collection:", Object.keys(allData));
+
+//     // In thử 1 vài thông tin thống kê
+//     for (const [name, data] of Object.entries(allData)) {
+//       console.log(`📘 ${name}: ${Array.isArray(data) ? data.length : 0} documents`);
+//     }
+
+//     // Kiểm tra cụ thể 1-2 collection
+//     console.log("🧩 Ví dụ 1 docusment trong 'Sach':");
+
+//   } catch (err) {
+//     console.error("❌ Lỗi khi gửi dữ liệu:", err);
+//   }
+// }
