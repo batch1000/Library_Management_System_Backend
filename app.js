@@ -14,6 +14,7 @@ app.use(
   "/api/notification",
   require("./app/api/notification/notification.routes")
 );
+app.use("/api/chatbot", require("./app/api/chatbot/chatbot.route"));
 
 module.exports = app;
 
@@ -2157,24 +2158,5 @@ function normalizeDate(date) {
 
 
 
-// const chatbotService = require("./chatbotData");
-// async function testSendDatabaseToChatBot() {
-//   try {
-//     const allData = await chatbotService.sendDatabaseToChatBot();
-
-//     // In ra tổng số collection đã lấy được
-//     console.log("✅ Số lượng collection:", Object.keys(allData).length);
-//     console.log("📂 Danh sách collection:", Object.keys(allData));
-
-//     // In thử 1 vài thông tin thống kê
-//     for (const [name, data] of Object.entries(allData)) {
-//       console.log(`📘 ${name}: ${Array.isArray(data) ? data.length : 0} documents`);
-//     }
-
-//     // Kiểm tra cụ thể 1-2 collection
-//     console.log("🧩 Ví dụ 1 docusment trong 'Sach':");
-
-//   } catch (err) {
-//     console.error("❌ Lỗi khi gửi dữ liệu:", err);
-//   }
-// }
+const chatbotDataService = require("./chatbotData");
+chatbotDataService.sendDatabaseToChatBot();
