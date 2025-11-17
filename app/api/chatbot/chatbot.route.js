@@ -4,19 +4,13 @@ const router = express.Router();
 const {
   healthChatbot,
   chatbot,
-  getTopBorrowedBooks,
-  getTopViewedBooks,
-  getTopRatedBooks,
-  getLowestRatedBooks,
-  getNewestBooks,
+  timSachLevel1,
+  timSachLevel2
 } = require("./chatbot.controller");
 
 router.get("/healthChatbot", healthChatbot);
 router.post("/chatbot", chatbot);
-router.get("/getTopBorrowedBooks", getTopBorrowedBooks);
-router.get("/getTopViewedBooks", getTopViewedBooks);
-router.get("/getTopRatedBooks", getTopRatedBooks);
-router.get("/getLowestRatedBooks", getLowestRatedBooks);
-router.get("/getNewestBooks", getNewestBooks);
+router.post("/tim_sach_level_1", timSachLevel1);
+router.post("/tim_sach_level_2", timSachLevel2);
 
 module.exports = router;

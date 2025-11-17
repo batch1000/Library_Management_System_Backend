@@ -70,100 +70,87 @@ async function chatbot(req, res) {
   }
 }
 
-// Top sách nhiều lượt mượn
-async function getTopBorrowedBooks(req, res) {
+async function timSachLevel1(req, res) {
   try {
-    const limit = parseInt(req.query.limit) || 10;
-    console.log(`📊 Controller: Lấy top ${limit} sách nhiều lượt mượn...`);
+    const classification = req.body;
+    console.log("*********Schema**********");
+    console.log(JSON.stringify(classification, null, 2));
 
-    const data = await chatbotService.getTopBorrowedBooks(limit);
+    // Validate input
+    if (!classification || !classification.intent) {
+      return res.status(400).json({
+        status: "error",
+        message: "Invalid classification data",
+      });
+    }
 
-    res.json(data); // Trả về mảng trực tiếp (không wrap trong object)
+    // Gọi service xử lý
+    const results = await chatbotService.timSachLevel1(classification);
+    console.log(JSON.stringify(results, null, 2));
+    // Trả về kết quả
+    res.json(results);
   } catch (error) {
-    console.error("❌ Lỗi getTopBorrowedBooks:", error.message);
+    console.error("❌ Lỗi tim_sach_level_1:", error.message);
 
     res.status(500).json({
       status: "error",
-      message: "Không thể lấy danh sách sách nhiều lượt mượn",
+      message: "Không thể tìm kiếm sách",
       error: error.message,
     });
   }
 }
 
-// Top sách nhiều lượt xem
-async function getTopViewedBooks(req, res) {
+async function timSachLevel2(req, res) {
   try {
-    const limit = parseInt(req.query.limit) || 10;
-    console.log(`📊 Controller: Lấy top ${limit} sách nhiều lượt xem...`);
+    const classification = req.body;
+    console.log("********* Schema Level 2 **********");
+    console.log(JSON.stringify(classification, null, 2));
 
-    const data = await chatbotService.getTopViewedBooks(limit);
+    // Validate input
+    if (!classification || !classification.intent) {
+      return res.status(400).json({
+        status: "error",
+        message: "Invalid classification data",
+      });
+    }
 
-    res.json(data);
+    if (classification.intent !== "tim_sach_level_2") {
+      return res.status(400).json({
+        status: "error",
+        message: "Intent must be tim_sach_level_2",
+      });
+    }
+
+    // Validate query structure
+    if (!classification.query || !classification.query.operator) {
+      return res.status(400).json({
+        status: "error",
+        message: "Missing query or operator in classification",
+      });
+    }
+
+    // Validate conditions
+    if (!classification.query.conditions || !Array.isArray(classification.query.conditions)) {
+      return res.status(400).json({
+        status: "error",
+        message: "Missing or invalid conditions array",
+      });
+    }
+
+    // Gọi service xử lý
+    const results = await chatbotService.timSachLevel2(classification);
+    
+    console.log(`✅ Found ${results.length} books (level 2)`);
+    console.log(JSON.stringify(results, null, 2));
+
+    // Trả về kết quả
+    res.json(results);
   } catch (error) {
-    console.error("❌ Lỗi getTopViewedBooks:", error.message);
+    console.error("❌ Lỗi tim_sach_level_2:", error.message);
 
     res.status(500).json({
       status: "error",
-      message: "Không thể lấy danh sách sách nhiều lượt xem",
-      error: error.message,
-    });
-  }
-}
-
-// Top sách rating cao
-async function getTopRatedBooks(req, res) {
-  try {
-    const limit = parseInt(req.query.limit) || 10;
-    console.log(`📊 Controller: Lấy top ${limit} sách rating cao...`);
-
-    const data = await chatbotService.getTopRatedBooks(limit);
-
-    res.json(data);
-  } catch (error) {
-    console.error("❌ Lỗi getTopRatedBooks:", error.message);
-
-    res.status(500).json({
-      status: "error",
-      message: "Không thể lấy danh sách sách rating cao",
-      error: error.message,
-    });
-  }
-}
-
-// Top sách rating thấp
-async function getLowestRatedBooks(req, res) {
-  try {
-    const limit = parseInt(req.query.limit) || 10;
-    console.log(`📊 Controller: Lấy top ${limit} sách rating thấp...`);
-
-    const data = await chatbotService.getLowestRatedBooks(limit);
-
-    res.json(data);
-  } catch (error) {
-    console.error("❌ Lỗi getLowestRatedBooks:", error.message);
-
-    res.status(500).json({
-      status: "error",
-      message: "Không thể lấy danh sách sách rating thấp",
-      error: error.message,
-    });
-  }
-}
-
-// Sách mới nhất
-async function getNewestBooks(req, res) {
-  try {
-    const limit = parseInt(req.query.limit) || 10;
-    console.log(`📊 Controller: Lấy ${limit} sách mới nhất...`);
-
-    const data = await chatbotService.getNewestBooks(limit);
-    res.json(data);
-  } catch (error) {
-    console.error("❌ Lỗi getNewestBooks:", error.message);
-
-    res.status(500).json({
-      status: "error",
-      message: "Không thể lấy danh sách sách mới nhất",
+      message: "Không thể tìm kiếm sách (level 2)",
       error: error.message,
     });
   }
@@ -172,9 +159,6 @@ async function getNewestBooks(req, res) {
 module.exports = {
   healthChatbot,
   chatbot,
-  getTopBorrowedBooks,
-  getTopViewedBooks,
-  getTopRatedBooks,
-  getLowestRatedBooks,
-  getNewestBooks
+  timSachLevel1,
+  timSachLevel2
 };

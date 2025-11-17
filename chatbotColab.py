@@ -158,7 +158,7 @@ VÍ DỤ tim_sach_level_2:
             {{ "field": "TacGia", "operator": "contains", "value": "A" }},
             {{ "field": "TacGia", "operator": "contains", "value": "B" }}
           ] }}
-     ] }} h
+     ] }}
 
 LOGIC PHÂN LOẠI (QUAN TRỌNG):
 - Dùng tim_sach_level_1: Câu hỏi đơn giản, 1 điều kiện hoặc nhiều điều kiện AND cơ bản (ví dụ: "Sách văn học của A năm 2020")
