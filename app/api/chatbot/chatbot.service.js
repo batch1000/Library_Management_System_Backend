@@ -555,6 +555,25 @@ async function timSachLevel2(classification) {
           } else if (condOperator === "equals") {
             mongoCondition.TenSach = value;
           }
+
+          // ✅ SỬA: Xử lý negate cho TenSach
+          if (negate && Object.keys(mongoCondition).length > 0) {
+            const fieldName = Object.keys(mongoCondition)[0];
+            const fieldValue = mongoCondition[fieldName];
+
+            if (fieldValue.$in !== undefined) {
+              mongoCondition = { [fieldName]: { $nin: fieldValue.$in } };
+            } else if (fieldValue.$regex !== undefined) {
+              mongoCondition = { [fieldName]: { $not: fieldValue } };
+            } else {
+              mongoCondition = { [fieldName]: { $ne: fieldValue } };
+            }
+          }
+
+          // ✅ SỬA: Push vào array
+          if (Object.keys(mongoCondition).length > 0) {
+            mongoConditions.push(mongoCondition);
+          }
         } else if (field === "TacGia") {
           if (condOperator === "contains") {
             const exactAuthors = await Sach.find({
@@ -586,6 +605,25 @@ async function timSachLevel2(classification) {
           } else if (condOperator === "equals") {
             mongoCondition.TacGia = value;
           }
+
+          // ✅ SỬA: Xử lý negate cho TacGia
+          if (negate && Object.keys(mongoCondition).length > 0) {
+            const fieldName = Object.keys(mongoCondition)[0];
+            const fieldValue = mongoCondition[fieldName];
+
+            if (fieldValue.$in !== undefined) {
+              mongoCondition = { [fieldName]: { $nin: fieldValue.$in } };
+            } else if (fieldValue.$regex !== undefined) {
+              mongoCondition = { [fieldName]: { $not: fieldValue } };
+            } else {
+              mongoCondition = { [fieldName]: { $ne: fieldValue } };
+            }
+          }
+
+          // ✅ SỬA: Push vào array
+          if (Object.keys(mongoCondition).length > 0) {
+            mongoConditions.push(mongoCondition);
+          }
         } else if (field === "TheLoai") {
           const theLoaiDoc = await TheLoaiSach.findOne({
             TenTheLoai: { $regex: value, $options: "i" },
@@ -613,6 +651,25 @@ async function timSachLevel2(classification) {
           } else {
             mongoCondition.MaTheLoai = theLoaiDoc._id;
           }
+
+          // ✅ SỬA: Xử lý negate cho TheLoai
+          if (negate && Object.keys(mongoCondition).length > 0) {
+            const fieldName = Object.keys(mongoCondition)[0];
+            const fieldValue = mongoCondition[fieldName];
+
+            if (fieldValue instanceof mongoose.Types.ObjectId) {
+              mongoCondition = { [fieldName]: { $ne: fieldValue } };
+            } else if (fieldValue.$in !== undefined) {
+              mongoCondition = { [fieldName]: { $nin: fieldValue.$in } };
+            } else {
+              mongoCondition = { $nor: [{ [fieldName]: fieldValue }] };
+            }
+          }
+
+          // ✅ SỬA: Push vào array
+          if (Object.keys(mongoCondition).length > 0) {
+            mongoConditions.push(mongoCondition);
+          }
         } else if (field === "NXB") {
           const nxbDoc = await NhaXuatBan.findOne({
             TenNXB: { $regex: value, $options: "i" },
@@ -638,8 +695,37 @@ async function timSachLevel2(classification) {
           } else {
             mongoCondition.MaNXB = nxbDoc._id;
           }
+
+          // ✅ SỬA: Xử lý negate cho NXB
+          if (negate && Object.keys(mongoCondition).length > 0) {
+            const fieldName = Object.keys(mongoCondition)[0];
+            const fieldValue = mongoCondition[fieldName];
+
+            if (fieldValue instanceof mongoose.Types.ObjectId) {
+              mongoCondition = { [fieldName]: { $ne: fieldValue } };
+            } else if (fieldValue.$in !== undefined) {
+              mongoCondition = { [fieldName]: { $nin: fieldValue.$in } };
+            } else {
+              mongoCondition = { $nor: [{ [fieldName]: fieldValue }] };
+            }
+          }
+
+          // ✅ SỬA: Push vào array
+          if (Object.keys(mongoCondition).length > 0) {
+            mongoConditions.push(mongoCondition);
+          }
         } else if (field === "LoaiSach") {
           mongoCondition.LoaiSach = value;
+
+          // ✅ SỬA: Xử lý negate cho LoaiSach
+          if (negate && Object.keys(mongoCondition).length > 0) {
+            mongoCondition = { LoaiSach: { $ne: value } };
+          }
+
+          // ✅ SỬA: Push vào array
+          if (Object.keys(mongoCondition).length > 0) {
+            mongoConditions.push(mongoCondition);
+          }
         } else if (field === "Khoa") {
           const khoaDoc = await Khoa.findOne({
             TenKhoa: { $regex: value, $options: "i" },
@@ -665,6 +751,25 @@ async function timSachLevel2(classification) {
           } else {
             mongoCondition.Khoa = khoaDoc._id;
           }
+
+          // ✅ SỬA: Xử lý negate cho Khoa
+          if (negate && Object.keys(mongoCondition).length > 0) {
+            const fieldName = Object.keys(mongoCondition)[0];
+            const fieldValue = mongoCondition[fieldName];
+
+            if (fieldValue instanceof mongoose.Types.ObjectId) {
+              mongoCondition = { [fieldName]: { $ne: fieldValue } };
+            } else if (fieldValue.$in !== undefined) {
+              mongoCondition = { [fieldName]: { $nin: fieldValue.$in } };
+            } else {
+              mongoCondition = { $nor: [{ [fieldName]: fieldValue }] };
+            }
+          }
+
+          // ✅ SỬA: Push vào array
+          if (Object.keys(mongoCondition).length > 0) {
+            mongoConditions.push(mongoCondition);
+          }
         } else if (field === "MoTaSach") {
           console.log("🔍 MoTaSach: Sử dụng semanticSearch...");
           const allMoTa = await Sach.find().distinct("MoTaSach");
@@ -681,6 +786,23 @@ async function timSachLevel2(classification) {
           } else {
             mongoCondition.MoTaSach = { $in: [] };
           }
+
+          // ✅ SỬA: Xử lý negate cho MoTaSach
+          if (negate && Object.keys(mongoCondition).length > 0) {
+            const fieldName = Object.keys(mongoCondition)[0];
+            const fieldValue = mongoCondition[fieldName];
+
+            if (fieldValue.$in !== undefined) {
+              mongoCondition = { [fieldName]: { $nin: fieldValue.$in } };
+            } else {
+              mongoCondition = { $nor: [{ [fieldName]: fieldValue }] };
+            }
+          }
+
+          // ✅ SỬA: Push vào array
+          if (Object.keys(mongoCondition).length > 0) {
+            mongoConditions.push(mongoCondition);
+          }
         } else if (field === "NamXuatBan") {
           if (condOperator === "gte") {
             mongoCondition.NamXuatBan = { $gte: value };
@@ -688,6 +810,16 @@ async function timSachLevel2(classification) {
             mongoCondition.NamXuatBan = { $lte: value };
           } else if (condOperator === "equals") {
             mongoCondition.NamXuatBan = value;
+          }
+
+          // ✅ SỬA: Xử lý negate cho NamXuatBan
+          if (negate && Object.keys(mongoCondition).length > 0) {
+            mongoCondition = { $nor: [mongoCondition] };
+          }
+
+          // ✅ SỬA: Push vào array
+          if (Object.keys(mongoCondition).length > 0) {
+            mongoConditions.push(mongoCondition);
           }
         } else if (field === "DonGia") {
           if (condOperator === "gte") {
@@ -697,19 +829,20 @@ async function timSachLevel2(classification) {
           } else if (condOperator === "equals") {
             mongoCondition.DonGia = value;
           }
+
+          // ✅ SỬA: Xử lý negate cho DonGia
+          if (negate && Object.keys(mongoCondition).length > 0) {
+            mongoCondition = { $nor: [mongoCondition] };
+          }
+
+          // ✅ SỬA: Push vào array
+          if (Object.keys(mongoCondition).length > 0) {
+            mongoConditions.push(mongoCondition);
+          }
         } else if (field === "SoSao") {
           // SoSao sẽ xử lý sau (vì cần aggregate từ DanhGiaSach)
           // Tạm thời skip ở đây
           continue;
-        }
-
-        // Xử lý negate (NOT)
-        if (negate && Object.keys(mongoCondition).length > 0) {
-          mongoCondition = { $not: mongoCondition };
-        }
-
-        if (Object.keys(mongoCondition).length > 0) {
-          mongoConditions.push(mongoCondition);
         }
       }
 
@@ -762,15 +895,18 @@ async function timSachLevel2(classification) {
     // BƯỚC 3: XỬ LÝ TOPLIST (WEIGHTED SCORING - FIXED)
     // ============================================
     if (topList && topList.length > 0) {
-      console.log("📊 Xử lý topList với weighted scoring (normalized):", topList);
+      console.log(
+        "📊 Xử lý topList với weighted scoring (normalized):",
+        topList
+      );
 
       // ✅ FIXED: Gán weight mặc định
       const defaultWeights = {
         LuotMuon: 2,
         LuotXem: 1,
-        DanhGia: 1.5
+        DanhGia: 1.5,
       };
-      
+
       for (let i = 0; i < topList.length; i++) {
         if (!topList[i].weight) {
           topList[i].weight = defaultWeights[topList[i].field] || 1;
@@ -812,7 +948,7 @@ async function timSachLevel2(classification) {
             },
           ]);
 
-          rawData.LuotMuon = borrowCounts.map(item => item.count);
+          rawData.LuotMuon = borrowCounts.map((item) => item.count);
           for (const item of borrowCounts) {
             if (bookScores[item._id]) {
               bookScores[item._id].scores.LuotMuon = item.count;
@@ -829,7 +965,7 @@ async function timSachLevel2(classification) {
             },
           ]);
 
-          rawData.LuotXem = viewCounts.map(item => item.count);
+          rawData.LuotXem = viewCounts.map((item) => item.count);
           for (const item of viewCounts) {
             if (bookScores[item._id]) {
               bookScores[item._id].scores.LuotXem = item.count;
@@ -847,7 +983,7 @@ async function timSachLevel2(classification) {
             },
           ]);
 
-          rawData.DanhGia = ratings.map(item => item.avgRating);
+          rawData.DanhGia = ratings.map((item) => item.avgRating);
           for (const item of ratings) {
             if (bookScores[item._id]) {
               bookScores[item._id].scores.DanhGia = item.avgRating;
@@ -881,10 +1017,10 @@ async function timSachLevel2(classification) {
           if (book.scores[field] !== undefined) {
             const rawValue = book.scores[field];
             const { min, max } = normalizers[field];
-            
+
             // Normalize về 0-100
             const normalizedValue = ((rawValue - min) / (max - min)) * 100;
-            
+
             book.normalizedScores[field] = normalizedValue;
             book.totalScore += normalizedValue * weight;
           }
@@ -911,7 +1047,9 @@ async function timSachLevel2(classification) {
         };
       });
 
-      console.log("✅ Top " + books.length + " sách theo weighted scoring (normalized)");
+      console.log(
+        "✅ Top " + books.length + " sách theo weighted scoring (normalized)"
+      );
       console.log("📈 Normalizers:", normalizers);
     }
 
