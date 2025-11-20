@@ -1812,6 +1812,16 @@ async function getAllReportStatistic(req, res) {
   }
 }
 
+async function getAllNXB(req, res) {
+  try {
+    const nxbList = await bookService.getAllNXB();
+    res.json(nxbList);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách nhà xuất bản:", error);
+    res.status(500).send("Lấy danh sách nhà xuất bản thất bại");
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -1897,5 +1907,7 @@ module.exports = {
   submitFileExcelReportStatistic,
   getReportStatisticByReporter,
   deleteOneReportStatistic,
-  getAllReportStatistic
+  getAllReportStatistic,
+
+  getAllNXB
 };

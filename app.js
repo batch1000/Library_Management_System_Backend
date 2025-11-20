@@ -759,7 +759,9 @@ function normalizeDate(date) {
   }
 })();
 
+
 // Auto check đóng đợt nộp luận văn
+
 const DotNopLuanVan = require("./app/models/dotnopluanvanModel");
 
 function normalizeDate(date) {
@@ -2122,6 +2124,92 @@ function normalizeDate(date) {
 //     } catch (err) {
 //         console.error("\n❌ LỖI:", err.message);
 //     }
+// })();
+
+
+// Dọn dẹp trạng thái no_show checked_in khi tạo tự động
+// (async () => {
+//   try {
+//     // Lấy danh sách đặt phòng bị no_show hoặc checked_in
+//     const bookings = await TheoDoiDatPhong.find({
+//       TrangThai: { $in: ["no_show", "checked_in"] }
+//     });
+
+//     let countUpdated = 0;
+
+//     for (const booking of bookings) {
+//       // Thành viên nào còn invited -> accepted
+//       booking.ThanhVien.forEach(member => {
+//         if (member.TrangThai === "invited") {
+//           member.TrangThai = "accepted";
+//         }
+//       });
+
+//       await booking.save();
+//       countUpdated++;
+//     }
+
+//     if (countUpdated > 0) {
+//       console.log(`Đã cập nhật ${countUpdated} booking no_show/checked_in.`);
+//     } else {
+//       console.log("Không có booking no_show/checked_in nào cần cập nhật.");
+//     }
+
+//   } catch (err) {
+//     console.error("Lỗi khi xử lý no_show/checked_in:", err.message);
+//   }
+// })();
+
+
+// Dọn dẹp trạng thái denied khi tạo tự động
+// (async () => {
+//   try {
+//     // Lấy tất cả booking bị denied
+//     const deniedBookings = await TheoDoiDatPhong.find({
+//       TrangThai: "denied"
+//     });
+
+//     let countUpdated = 0;
+
+//     for (const booking of deniedBookings) {
+//       // Thành viên nào còn invited -> declined
+//       booking.ThanhVien.forEach(member => {
+//         if (member.TrangThai === "invited") {
+//           member.TrangThai = "declined";
+//         }
+//       });
+
+//       await booking.save();
+//       countUpdated++;
+//     }
+
+//     if (countUpdated > 0) {
+//       console.log(`Đã cập nhật ${countUpdated} booking denied.`);
+//     } else {
+//       console.log("Không có booking denied nào cần cập nhật.");
+//     }
+
+//   } catch (err) {
+//     console.error("Lỗi khi xử lý denied:", err.message);
+//   }
+// })();
+
+// (async () => {
+//   try {
+//     const bookingId = "690a5f50b433881b485bf461"; 
+
+//     const room = await TheoDoiDatPhong.findById(bookingId)
+//       .populate("PhongHoc DocGia ThanhVien.DocGia");
+
+//     if (!room) {
+//       console.log("⛔ Không tìm thấy phòng với id:", bookingId);
+//       return;
+//     }
+
+//     console.log("📌 Thông tin phòng theo id:", room);
+//   } catch (err) {
+//     console.error("❌ Lỗi khi lấy phòng theo id:", err.message);
+//   }
 // })();
 
 

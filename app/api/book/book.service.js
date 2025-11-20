@@ -3042,6 +3042,16 @@ async function getAllReportStatistic() {
   }
 }
 
+async function getAllNXB() {
+  try {
+    const nxbList = await NhaXuatBan.find().exec();
+    return nxbList;
+  } catch (err) {
+    console.error("Lỗi khi truy vấn tất cả nhà xuất bản:", err);
+    throw err;
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -3126,5 +3136,7 @@ module.exports = {
   submitFileExcelReportStatistic,
   getReportStatisticByReporter,
   deleteOneReportStatistic,
-  getAllReportStatistic
+  getAllReportStatistic,
+
+  getAllNXB
 };

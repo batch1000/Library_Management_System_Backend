@@ -86,7 +86,9 @@ const {
   submitFileExcelReportStatistic,
   getReportStatisticByReporter,
   deleteOneReportStatistic,
-  getAllReportStatistic
+  getAllReportStatistic,
+
+  getAllNXB
 } = require("./book.controller");
 
 const router = express.Router();
@@ -242,5 +244,7 @@ router.post("/submitFileExcelReportStatistic", uploadExcel.single('file'), submi
 router.post("/getReportStatisticByReporter", getReportStatisticByReporter);
 router.delete("/deleteOneReportStatistic", deleteOneReportStatistic);
 router.get("/getAllReportStatistic", getAllReportStatistic);
+
+router.get("/getAllNXB", getAllNXB);
 
 module.exports = router;
