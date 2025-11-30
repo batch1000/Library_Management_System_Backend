@@ -69,8 +69,8 @@ SCHEMA CHO tim_sach_level_1:
     "MoTaSach": null,             // Mô tả sách (string hoặc null)
     "NamXuatBanMin": null,        // Năm xuất bản min (number hoặc null)
     "NamXuatBanMax": null,        // Năm xuất bản max (number hoặc null)
-    "DonGiaMin": null,            // Giá sách min (number hoặc null)
-    "DonGiaMax": null,            // Giá sách max (number hoặc null)
+    "DonGiaMin": null,            // Giá sách min (number hoặc null). Ví dụ 75 ngìn (ngàn) thì nó lưu 75000
+    "DonGiaMax": null,            // Giá sách max (number hoặc null). Ví dụ 75 ngìn (ngàn) thì nó lưu 75000
     "SoSaoMin": null,             // Số sao min (number hoặc null)
     "SoSaoMax": null              // Số sao max (number hoặc null)
   }},
@@ -414,7 +414,7 @@ def chatbot():
                 # Kiểm tra xem có phải weighted scoring không
                 topList = classification.get("topList", [])
                 is_weighted_scoring = topList and len(topList) > 1
-                
+
                 # Tạo prompt cho Gemini để format kết quả đẹp
                 format_prompt = f"""Dựa vào dữ liệu sau, hãy trả lời câu hỏi "{user_message}" một cách tự nhiên:
 
@@ -502,7 +502,7 @@ TRẢ LỜI:"""
                 # Kiểm tra xem có phải weighted scoring không
                 topList = classification.get("topList", [])
                 is_weighted_scoring = topList and len(topList) > 1
-                
+
                 # Tạo prompt cho Gemini để format kết quả đẹp
                 format_prompt = f"""Dựa vào dữ liệu sau, hãy trả lời câu hỏi "{user_message}" một cách tự nhiên:
 

@@ -1529,183 +1529,124 @@ async function getTodayBook(limit = 6) {
 }
 
 async function getTrendingBook(limit) {
-  // Nếu có truyền limit thì đảm bảo là số dương hợp lệ
   if (limit !== undefined && limit !== null) {
     limit = Math.max(1, parseInt(limit) || 1);
   }
 
-  // xác định khoảng thời gian cho tính growth_rate
   let endOfPeriod = new Date();
   let startOfWeek = new Date(endOfPeriod);
-  startOfWeek.setDate(endOfPeriod.getDate() - 6); // 7 ngày gần nhất
+  startOfWeek.setDate(endOfPeriod.getDate() - 6);
   startOfWeek.setHours(0, 0, 0, 0);
 
   let startOf2Weeks = new Date(endOfPeriod);
-  startOf2Weeks.setDate(endOfPeriod.getDate() - 13); // 14 ngày gần nhất
+  startOf2Weeks.setDate(endOfPeriod.getDate() - 13);
   startOf2Weeks.setHours(0, 0, 0, 0);
 
   endOfPeriod.setHours(23, 59, 59, 999);
 
-  let allScoredBooks = []; // tích lũy sách từ nhiều tuần
-  const processedBookIds = new Set(); // tránh trùng lặp
+  let allScoredBooks = [];
+  const processedBookIds = new Set();
 
-  // Hàm gom dữ liệu cho tính growth_rate
   async function getPeriodData(start7d, end, start14d) {
     const views7dAgg = await TheoDoiXemSach.aggregate([
       { $match: { ThoiDiemXem: { $gte: start7d, $lt: end } } },
-      { $group: { _id: "$MaSach", views_7d: { $sum: 1 } } },
+      { $group: { _id: "$MaSach", views_7d: { $sum: 1 } } }
     ]);
 
     const borrows7dAgg = await TheoDoiMuonSach.aggregate([
-      {
-        $match: {
-          NgayMuon: { $gte: start7d, $lt: end },
-          TrangThai: { $in: ["approved", "returned"] },
-        },
-      },
-      { $group: { _id: "$MaSach", borrows_7d: { $sum: 1 } } },
+      { $match: { NgayMuon: { $gte: start7d, $lt: end }, TrangThai: { $in: ["approved", "returned"] } } },
+      { $group: { _id: "$MaSach", borrows_7d: { $sum: 1 } } }
     ]);
 
     const ratings7dAgg = await DanhGiaSach.aggregate([
       { $match: { NgayDanhGia: { $gte: start7d, $lt: end } } },
-      { $group: { _id: "$MaSach", ratings_7d: { $sum: 1 } } },
+      { $group: { _id: "$MaSach", ratings_7d: { $sum: 1 } } }
     ]);
 
     const views14dAgg = await TheoDoiXemSach.aggregate([
       { $match: { ThoiDiemXem: { $gte: start14d, $lt: end } } },
-      { $group: { _id: "$MaSach", views_14d: { $sum: 1 } } },
+      { $group: { _id: "$MaSach", views_14d: { $sum: 1 } } }
     ]);
 
     const borrows14dAgg = await TheoDoiMuonSach.aggregate([
-      {
-        $match: {
-          NgayMuon: { $gte: start14d, $lt: end },
-          TrangThai: { $in: ["approved", "returned"] },
-        },
-      },
-      { $group: { _id: "$MaSach", borrows_14d: { $sum: 1 } } },
+      { $match: { NgayMuon: { $gte: start14d, $lt: end }, TrangThai: { $in: ["approved", "returned"] } } },
+      { $group: { _id: "$MaSach", borrows_14d: { $sum: 1 } } }
     ]);
 
     const ratings14dAgg = await DanhGiaSach.aggregate([
       { $match: { NgayDanhGia: { $gte: start14d, $lt: end } } },
-      { $group: { _id: "$MaSach", ratings_14d: { $sum: 1 } } },
+      { $group: { _id: "$MaSach", ratings_14d: { $sum: 1 } } }
     ]);
 
     const scoreMap = new Map();
 
-    function ensureEntry(bookIdStr) {
-      if (!scoreMap.has(bookIdStr)) {
-        scoreMap.set(bookIdStr, {
+    function ensureEntry(id) {
+      if (!scoreMap.has(id)) {
+        scoreMap.set(id, {
           views_7d: 0,
           borrows_7d: 0,
           ratings_7d: 0,
           views_14d: 0,
           borrows_14d: 0,
-          ratings_14d: 0,
+          ratings_14d: 0
         });
       }
-      return scoreMap.get(bookIdStr);
+      return scoreMap.get(id);
     }
 
-    views7dAgg.forEach((d) => {
-      const entry = ensureEntry(d._id.toString());
-      entry.views_7d = d.views_7d || 0;
-    });
-    borrows7dAgg.forEach((d) => {
-      const entry = ensureEntry(d._id.toString());
-      entry.borrows_7d = d.borrows_7d || 0;
-    });
-    ratings7dAgg.forEach((d) => {
-      const entry = ensureEntry(d._id.toString());
-      entry.ratings_7d = d.ratings_7d || 0;
-    });
+    views7dAgg.forEach(d => ensureEntry(d._id.toString()).views_7d = d.views_7d);
+    borrows7dAgg.forEach(d => ensureEntry(d._id.toString()).borrows_7d = d.borrows_7d);
+    ratings7dAgg.forEach(d => ensureEntry(d._id.toString()).ratings_7d = d.ratings_7d);
 
-    views14dAgg.forEach((d) => {
-      const entry = ensureEntry(d._id.toString());
-      entry.views_14d = d.views_14d || 0;
-    });
-    borrows14dAgg.forEach((d) => {
-      const entry = ensureEntry(d._id.toString());
-      entry.borrows_14d = d.borrows_14d || 0;
-    });
-    ratings14dAgg.forEach((d) => {
-      const entry = ensureEntry(d._id.toString());
-      entry.ratings_14d = d.ratings_14d || 0;
-    });
+    views14dAgg.forEach(d => ensureEntry(d._id.toString()).views_14d = d.views_14d);
+    borrows14dAgg.forEach(d => ensureEntry(d._id.toString()).borrows_14d = d.borrows_14d);
+    ratings14dAgg.forEach(d => ensureEntry(d._id.toString()).ratings_14d = d.ratings_14d);
 
     const result = [];
-    for (const [bookIdStr, counts] of scoreMap.entries()) {
-      if (!processedBookIds.has(bookIdStr)) {
-        const recent_activity =
-          counts.views_7d + counts.borrows_7d + counts.ratings_7d;
-        const total_activity =
-          counts.views_14d + counts.borrows_14d + counts.ratings_14d;
-        const previous_activity = total_activity - recent_activity;
 
-        let trending_score = 0;
+    for (const [id, c] of scoreMap.entries()) {
+      if (!processedBookIds.has(id)) {
+        const recent = c.views_7d + c.borrows_7d + c.ratings_7d;
+        const total = c.views_14d + c.borrows_14d + c.ratings_14d;
+        const prev = total - recent;
 
-        // CÔNG THỨC MỚI: ANTI-POPULAR + FRESH DISCOVERY
+        let score = 0;
 
-        // Bước 1: Lọc sách - chỉ xét sách chưa quá popular (total < 120)
-        if (total_activity >= 120) {
-          // console.log(`Loai sach qua popular - Book: ${bookIdStr}, total_activity: ${total_activity} >= 120`);
-        }
-        // Bước 2: Phải có hoạt động tối thiểu trong 7 ngày gần
-        else if (recent_activity < 8) {
-          // console.log(`Khong du hoat dong gan day - Book: ${bookIdStr}, recent_activity: ${recent_activity} < 8`);
-        }
-        // Bước 3: Tính điểm cho sách fresh/trending
-        else {
-          // Freshness bonus: sách càng ít lịch sử càng được ưu tiên
-          const freshness_bonus = Math.max(0.3, (120 - total_activity) / 120);
+        if (total < 120 && recent >= 8) {
+          const freshness = Math.max(0.3, (120 - total) / 120);
+          const momentum = recent * 2;
 
-          // Recent momentum: nhân đôi trọng số hoạt động gần đây
-          const recent_momentum = recent_activity * 2;
-
-          // Growth factor: nếu có tăng trưởng thì bonus
-          let growth_factor = 1.0;
-          if (previous_activity > 0 && recent_activity > previous_activity) {
-            growth_factor =
-              1 +
-              Math.min(
-                (recent_activity - previous_activity) / previous_activity,
-                1.0
-              );
+          let growth = 1;
+          if (prev > 0 && recent > prev) {
+            growth = 1 + Math.min((recent - prev) / prev, 1);
           }
 
-          // Công thức cuối: Fresh Discovery Score
-          trending_score = recent_momentum * freshness_bonus * growth_factor;
-
-          // console.log(`Fresh Discovery - Book: ${bookIdStr}, recent: ${recent_activity}, total: ${total_activity}, freshness_bonus: ${freshness_bonus.toFixed(2)}, growth_factor: ${growth_factor.toFixed(2)}, trending_score: ${trending_score.toFixed(3)}`);
+          score = momentum * freshness * growth;
         }
 
         result.push({
-          bookIdStr,
-          views_7d: counts.views_7d,
-          borrows_7d: counts.borrows_7d,
-          ratings_7d: counts.ratings_7d,
-          views_14d: counts.views_14d,
-          borrows_14d: counts.borrows_14d,
-          ratings_14d: counts.ratings_14d,
-          growth_rate: trending_score,
+          bookIdStr: id,
+          views_7d: c.views_7d,
+          borrows_7d: c.borrows_7d,
+          ratings_7d: c.ratings_7d,
+          views_14d: c.views_14d,
+          borrows_14d: c.borrows_14d,
+          ratings_14d: c.ratings_14d,
+          growth_rate: score
         });
 
-        processedBookIds.add(bookIdStr);
+        processedBookIds.add(id);
       }
     }
 
     return result;
   }
 
-  // Fallback logic: lùi period cho đến khi đủ sách
   let tries = 0;
+
   while ((!limit || allScoredBooks.length < limit) && tries < 12) {
-    const periodData = await getPeriodData(
-      startOfWeek,
-      endOfPeriod,
-      startOf2Weeks
-    );
-    allScoredBooks.push(...periodData);
+    const data = await getPeriodData(startOfWeek, endOfPeriod, startOf2Weeks);
+    allScoredBooks.push(...data);
 
     if (limit && allScoredBooks.length >= limit) break;
 
@@ -1715,187 +1656,121 @@ async function getTrendingBook(limit) {
     tries++;
   }
 
-  if (allScoredBooks.length === 0) {
-    return [];
+  const valid = allScoredBooks.filter(b => b.growth_rate > 0);
+
+  // 🔥 FALLBACK: nếu 3 tháng không có hoạt động → lấy sách mới nhất
+  if (valid.length === 0) {
+    return await Sach.find().select("MaSach TenSach TacGia Image").limit(limit).lean();
   }
 
-  // Lọc ra chỉ những sách có trending_score > 0
-  const validTrendingBooks = allScoredBooks.filter(
-    (book) => book.growth_rate > 0
-  );
+  valid.sort((a, b) => b.growth_rate - a.growth_rate);
 
-  if (validTrendingBooks.length === 0) {
-    return [];
-  }
+  const top = limit ? valid.slice(0, limit) : valid;
 
-  // Sắp xếp theo growth_rate giảm dần
-  validTrendingBooks.sort((a, b) => b.growth_rate - a.growth_rate);
-
-  // Nếu có limit thì slice, nếu không thì lấy hết
-  const topSlice = limit
-    ? validTrendingBooks.slice(0, limit)
-    : validTrendingBooks;
-
-  // Lấy thông tin sách
-  const bookIds = topSlice.map((s) => mongoose.Types.ObjectId(s.bookIdStr));
-  const bookDocs = await Sach.find({ _id: { $in: bookIds } })
+  const ids = top.map(x => mongoose.Types.ObjectId(x.bookIdStr));
+  const docs = await Sach.find({ _id: { $in: ids } })
     .select("MaSach TenSach TacGia Image")
     .lean();
-  const bookDocMap = new Map(bookDocs.map((b) => [b._id.toString(), b]));
 
-  // Tính số sao trung bình
-  const ratingsData = await DanhGiaSach.aggregate([
-    { $match: { MaSach: { $in: bookIds } } },
-    {
-      $group: {
-        _id: "$MaSach",
-        avgRating: { $avg: "$SoSao" },
-        totalRatings: { $sum: 1 },
-      },
-    },
+  const map = new Map();
+  docs.forEach(d => map.set(d._id.toString(), d));
+
+  const ratings = await DanhGiaSach.aggregate([
+    { $match: { MaSach: { $in: ids } } },
+    { $group: { _id: "$MaSach", avgRating: { $avg: "$SoSao" }, totalRatings: { $sum: 1 } } }
   ]);
-  const ratingsMap = new Map(
-    ratingsData.map((r) => [
-      r._id.toString(),
-      {
-        avgRating: r.avgRating || 0,
-        totalRatings: r.totalRatings || 0,
-      },
-    ])
-  );
 
-  // Gộp kết quả cuối
-  const finalResult = topSlice.map((item) => {
-    const doc = bookDocMap.get(item.bookIdStr);
-    const rating = ratingsMap.get(item.bookIdStr) || {
-      avgRating: 0,
-      totalRatings: 0,
-    };
+  const rateMap = new Map();
+  ratings.forEach(r => rateMap.set(r._id.toString(), r));
+
+  return top.map(item => {
+    const doc = map.get(item.bookIdStr);
+    const r = rateMap.get(item.bookIdStr);
 
     return {
       _id: doc ? doc._id : mongoose.Types.ObjectId(item.bookIdStr),
-      MaSach: doc ? doc.MaSach : null,
+      MaSach: doc ? doc.MaSach : "",
       TenSach: doc ? doc.TenSach : "",
       TacGia: doc ? doc.TacGia : "",
       Image: doc ? doc.Image : "",
       views_7d: item.views_7d,
       borrows_7d: item.borrows_7d,
       ratings_7d: item.ratings_7d,
-      views_14d: item.views_14d,
-      borrows_14d: item.borrows_14d,
-      ratings_14d: item.ratings_14d,
       growth_rate: parseFloat(item.growth_rate.toFixed(3)),
-      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)), // giống getTodayBook
+      SoSaoTB: r ? parseFloat(r.avgRating.toFixed(1)) : 0
     };
   });
-
-  return finalResult;
 }
 
 async function getPopularBook(limit) {
-  // Nếu có truyền limit thì đảm bảo là số dương hợp lệ
   if (limit !== undefined && limit !== null) {
     limit = Math.max(1, parseInt(limit) || 1);
   }
 
-  // Lấy tổng views cho mỗi sách
   const viewsAgg = await TheoDoiXemSach.aggregate([
-    { $group: { _id: "$MaSach", views: { $sum: 1 } } },
+    { $group: { _id: "$MaSach", views: { $sum: 1 } } }
   ]);
 
-  // Lấy tổng borrows cho mỗi sách (chỉ tính approved + returned)
   const borrowsAgg = await TheoDoiMuonSach.aggregate([
     { $match: { TrangThai: { $in: ["approved", "returned"] } } },
-    { $group: { _id: "$MaSach", borrows: { $sum: 1 } } },
+    { $group: { _id: "$MaSach", borrows: { $sum: 1 } } }
   ]);
 
-  // Lấy tổng ratings cho mỗi sách
   const ratingsAgg = await DanhGiaSach.aggregate([
-    { $group: { _id: "$MaSach", ratings: { $sum: 1 } } },
+    { $group: { _id: "$MaSach", ratings: { $sum: 1 } } }
   ]);
 
-  // Gom dữ liệu lại theo bookId
   const scoreMap = new Map();
 
-  function ensureEntry(bookIdStr) {
-    if (!scoreMap.has(bookIdStr)) {
-      scoreMap.set(bookIdStr, { views: 0, borrows: 0, ratings: 0 });
+  function ensureEntry(id) {
+    if (!scoreMap.has(id)) {
+      scoreMap.set(id, { views: 0, borrows: 0, ratings: 0 });
     }
-    return scoreMap.get(bookIdStr);
+    return scoreMap.get(id);
   }
 
-  viewsAgg.forEach((d) => {
-    const entry = ensureEntry(d._id.toString());
-    entry.views = d.views || 0;
-  });
+  viewsAgg.forEach(d => ensureEntry(d._id.toString()).views = d.views);
+  borrowsAgg.forEach(d => ensureEntry(d._id.toString()).borrows = d.borrows);
+  ratingsAgg.forEach(d => ensureEntry(d._id.toString()).ratings = d.ratings);
 
-  borrowsAgg.forEach((d) => {
-    const entry = ensureEntry(d._id.toString());
-    entry.borrows = d.borrows || 0;
-  });
-
-  ratingsAgg.forEach((d) => {
-    const entry = ensureEntry(d._id.toString());
-    entry.ratings = d.ratings || 0;
-  });
-
-  // Tính score cho từng sách
-  const scoredBooks = [];
-  for (const [bookIdStr, counts] of scoreMap.entries()) {
-    const score =
-      0.2 * counts.views + 0.5 * counts.borrows + 0.3 * counts.ratings;
-    scoredBooks.push({ bookIdStr, ...counts, score });
+  const scored = [];
+  for (const [id, c] of scoreMap.entries()) {
+    const s = 0.2 * c.views + 0.5 * c.borrows + 0.3 * c.ratings;
+    scored.push({ bookIdStr: id, views: c.views, borrows: c.borrows, ratings: c.ratings, score: s });
   }
 
-  if (scoredBooks.length === 0) {
-    return [];
+  // 🔥 FALLBACK: nếu thư viện ngủ yên 3 tháng → score = 0 hết nhưng vẫn trả sách
+  if (scored.length === 0) {
+    return await Sach.find().select("MaSach TenSach TacGia Image DonGia").limit(limit).lean();
   }
 
-  // Sắp xếp theo score giảm dần
-  scoredBooks.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score);
 
-  // Nếu có limit thì slice, nếu không thì lấy hết
-  const topSlice = limit ? scoredBooks.slice(0, limit) : scoredBooks;
+  const top = limit ? scored.slice(0, limit) : scored;
+  const ids = top.map(x => mongoose.Types.ObjectId(x.bookIdStr));
 
-  // Lấy thông tin sách
-  const bookIds = topSlice.map((s) => mongoose.Types.ObjectId(s.bookIdStr));
-  const bookDocs = await Sach.find({ _id: { $in: bookIds } })
+  const docs = await Sach.find({ _id: { $in: ids } })
     .select("MaSach TenSach TacGia Image DonGia")
     .lean();
-  const bookDocMap = new Map(bookDocs.map((b) => [b._id.toString(), b]));
 
-  // Tính số sao trung bình
-  const ratingsData = await DanhGiaSach.aggregate([
-    { $match: { MaSach: { $in: bookIds } } },
-    {
-      $group: {
-        _id: "$MaSach",
-        avgRating: { $avg: "$SoSao" },
-        totalRatings: { $sum: 1 },
-      },
-    },
+  const map = new Map();
+  docs.forEach(d => map.set(d._id.toString(), d));
+
+  const ratings = await DanhGiaSach.aggregate([
+    { $match: { MaSach: { $in: ids } } },
+    { $group: { _id: "$MaSach", avgRating: { $avg: "$SoSao" }, totalRatings: { $sum: 1 } } }
   ]);
-  const ratingsMap = new Map(
-    ratingsData.map((r) => [
-      r._id.toString(),
-      {
-        avgRating: r.avgRating || 0,
-        totalRatings: r.totalRatings || 0,
-      },
-    ])
-  );
 
-  // Gộp kết quả cuối
-  const finalResult = topSlice.map((item) => {
-    const doc = bookDocMap.get(item.bookIdStr);
-    const rating = ratingsMap.get(item.bookIdStr) || {
-      avgRating: 0,
-      totalRatings: 0,
-    };
+  const rateMap = new Map();
+  ratings.forEach(r => rateMap.set(r._id.toString(), r));
+
+  return top.map(item => {
+    const doc = map.get(item.bookIdStr);
+    const r = rateMap.get(item.bookIdStr);
 
     return {
       _id: doc ? doc._id : mongoose.Types.ObjectId(item.bookIdStr),
-      MaSach: doc ? doc.MaSach : null,
+      MaSach: doc ? doc.MaSach : "",
       TenSach: doc ? doc.TenSach : "",
       TacGia: doc ? doc.TacGia : "",
       Image: doc ? doc.Image : "",
@@ -1903,12 +1778,10 @@ async function getPopularBook(limit) {
       views: item.views,
       borrows: item.borrows,
       ratings: item.ratings,
-      score: parseFloat(item.score.toFixed(3)), // làm tròn 3 chữ số thập phân
-      SoSaoTB: parseFloat(rating.avgRating.toFixed(1)), // làm tròn 1 chữ số thập phân
+      score: parseFloat(item.score.toFixed(3)),
+      SoSaoTB: r ? parseFloat(r.avgRating.toFixed(1)) : 0
     };
   });
-
-  return finalResult;
 }
 
 async function getBookPenaltyRule() {
