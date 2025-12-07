@@ -1660,7 +1660,24 @@ async function getTrendingBook(limit) {
 
   // 🔥 FALLBACK: nếu 3 tháng không có hoạt động → lấy sách mới nhất
   if (valid.length === 0) {
-    return await Sach.find().select("MaSach TenSach TacGia Image").limit(limit).lean();
+    const fallbackBooks = await Sach.find().select("MaSach TenSach TacGia Image").limit(limit).lean();
+    
+    // Lấy rating cho fallback books
+    const fallbackIds = fallbackBooks.map(b => b._id);
+    const fallbackRatings = await DanhGiaSach.aggregate([
+      { $match: { MaSach: { $in: fallbackIds } } },
+      { $group: { _id: "$MaSach", avgRating: { $avg: "$SoSao" }, totalRatings: { $sum: 1 } } }
+    ]);
+    
+    const fallbackRateMap = new Map();
+    fallbackRatings.forEach(r => fallbackRateMap.set(r._id.toString(), r));
+    
+    return fallbackBooks.map(book => ({
+      ...book,
+      SoSaoTB: fallbackRateMap.has(book._id.toString()) 
+        ? parseFloat(fallbackRateMap.get(book._id.toString()).avgRating.toFixed(1)) 
+        : 0
+    }));
   }
 
   valid.sort((a, b) => b.growth_rate - a.growth_rate);
