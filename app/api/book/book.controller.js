@@ -1212,9 +1212,9 @@ async function rejectThesis(req, res) {
 // 1. Tạo đợt nộp luận văn
 async function createDotNop(req, res) {
   try {
-    const { TenDot, ThoiGianMoNop, ThoiGianDongNop, KyHoc, NamHoc } = req.body;
+    const { TenDot, ThoiGianMoNop, ThoiGianDongNop, KyHoc, NamHoc, SoLuongPhaiNop } = req.body;
 
-    if (!TenDot || !ThoiGianMoNop || !ThoiGianDongNop || !KyHoc || !NamHoc) {
+    if (!TenDot || !ThoiGianMoNop || !ThoiGianDongNop || !KyHoc || !NamHoc || !SoLuongPhaiNop) {
       return res.status(400).json({ error: "Vui lòng điền đầy đủ thông tin" });
     }
 
@@ -1224,6 +1224,7 @@ async function createDotNop(req, res) {
       ThoiGianDongNop,
       KyHoc,
       NamHoc,
+      SoLuongPhaiNop,
     });
 
     res.json(result);
@@ -1435,9 +1436,9 @@ async function getOneNienLuan(req, res) {
 // 3. Tạo đợt nộp niên luận (Giảng viên)
 async function createDotNopNienLuan(req, res) {
   try {
-    const { TenDot, ThoiGianMoNop, ThoiGianDongNop, KyHoc, NamHoc, MaGiangVien } = req.body;
+    const { TenDot, ThoiGianMoNop, ThoiGianDongNop, KyHoc, NamHoc, MaGiangVien, SoLuongPhaiNop } = req.body;
 
-    if (!TenDot || !ThoiGianMoNop || !ThoiGianDongNop || !KyHoc || !NamHoc || !MaGiangVien) {
+    if (!TenDot || !ThoiGianMoNop || !ThoiGianDongNop || !KyHoc || !NamHoc || !MaGiangVien || !SoLuongPhaiNop) {
       return res.status(400).json({ error: "Vui lòng điền đầy đủ thông tin" });
     }
 
@@ -1448,6 +1449,7 @@ async function createDotNopNienLuan(req, res) {
       KyHoc,
       NamHoc,
       MaGiangVien,
+      SoLuongPhaiNop,
     });
 
     res.json(result);
@@ -1598,6 +1600,16 @@ async function rejectNienLuan(req, res) {
 async function getAllGiangVien(req, res) {
   try {
     const result = await bookService.getAllGiangVien();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách giảng viên:", error);
+    res.status(500).json({ error: "Lỗi server khi lấy danh sách giảng viên" });
+  }
+}
+
+async function getAllGiangVienForAdmin(req, res) {
+  try {
+    const result = await bookService.getAllGiangVienForAdmin();
     res.json(result);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách giảng viên:", error);
@@ -1822,6 +1834,67 @@ async function getAllNXB(req, res) {
   }
 }
 
+
+async function getAllNienLuanForAdmin(req, res) {
+  try {
+    const result = await bookService.getAllNienLuanForAdmin();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách niên luận cho admin:", error);
+    res.status(500).json({
+      error: "Lỗi server khi lấy danh sách niên luận cho admin"
+    });
+  }
+}
+
+async function getAllDotNopForAdmin(req, res) {
+  try {
+    const result = await bookService.getAllDotNopForAdmin();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách đợt nộp cho admin:", error);
+    res.status(500).json({
+      error: "Lỗi server khi lấy danh sách đợt nộp cho admin"
+    });
+  }
+}
+
+async function getStatisticsByDot(req, res) {
+  try {
+    const result = await bookService.getStatisticsByDot();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi thống kê theo đợt nộp:", error);
+    res.status(500).json({
+      error: "Lỗi server khi thống kê theo đợt nộp"
+    });
+  }
+}
+
+async function getAllNganhHoc(req, res) {
+  try {
+    const result = await bookService.getAllNganhHoc();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách ngành học:", error);
+    res.status(500).json({
+      error: "Lỗi server khi lấy danh sách ngành học"
+    });
+  }
+}
+
+async function getAllBoMon(req, res) {
+  try {
+    const result = await bookService.getAllBoMon();
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách bộ môn:", error);
+    res.status(500).json({
+      error: "Lỗi server khi lấy danh sách bộ môn"
+    });
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -1909,5 +1982,13 @@ module.exports = {
   deleteOneReportStatistic,
   getAllReportStatistic,
 
-  getAllNXB
+  getAllNXB,
+
+  getAllNienLuanForAdmin,
+  getAllDotNopForAdmin,
+  getStatisticsByDot,
+
+  getAllNganhHoc,
+  getAllGiangVienForAdmin,
+  getAllBoMon
 };

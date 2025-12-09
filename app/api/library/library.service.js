@@ -939,6 +939,188 @@ async function uploadLibraryCardsExcelForStudents(file) {
   }
 }
 
+async function updateOneLibraryCardStudent(cardId, updateData) {
+  try {
+    const { HoLot, Ten, MaNganhHoc } = updateData;
+
+    // Tìm thẻ thư viện
+    const card = await TheThuVien.findById(cardId).populate("DocGia");
+    if (!card) {
+      throw new Error("Không tìm thấy thẻ thư viện");
+    }
+
+    // Kiểm tra xem có phải thẻ sinh viên không
+    if (card.DocGia.DoiTuong !== "Sinh viên") {
+      throw new Error("Thẻ này không phải của sinh viên");
+    }
+
+    // Kiểm tra ngành học có tồn tại không
+    const nganhHoc = await NganhHoc.findById(MaNganhHoc).populate("Khoa");
+    if (!nganhHoc) {
+      throw new Error("Ngành học không tồn tại");
+    }
+
+    // Cập nhật thông tin độc giả
+    await DocGia.findByIdAndUpdate(
+      card.DocGia._id,
+      {
+        HoLot: HoLot.trim(),
+        Ten: Ten.trim(),
+      },
+      { new: true, runValidators: true }
+    );
+
+    // Cập nhật thông tin sinh viên
+    await SinhVien.findOneAndUpdate(
+      { MaDocGia: card.DocGia._id },
+      {
+        MaNganhHoc: MaNganhHoc,
+      },
+      { new: true, runValidators: true }
+    );
+
+    // Lấy thông tin đầy đủ sau khi cập nhật
+    const updatedCard = await TheThuVien.findById(cardId)
+      .populate({
+        path: "DocGia",
+        select: "HoLot Ten MaDocGia NgaySinh Phai DiaChi DienThoai DoiTuong",
+      });
+
+    const studentInfo = await SinhVien.findOne({ MaDocGia: card.DocGia._id })
+      .populate("MaLop", "TenLop")
+      .populate({
+        path: "MaNganhHoc",
+        select: "TenNganh Khoa",
+        populate: {
+          path: "Khoa",
+          select: "TenKhoa",
+        },
+      })
+      .populate("MaNienKhoa", "TenNienKhoa");
+
+    const extendHistory = await ThongTinGiaHan.find({
+      MaThe: cardId,
+    }).sort({
+      NgayGiaHan: -1,
+    });
+
+    const reissueHistory = await ThongTinCapLaiThe.find({
+      MaThe: cardId,
+    }).sort({
+      NgayYeuCau: -1,
+    });
+
+    return {
+      ...updatedCard.toObject(),
+      additionalInfo: studentInfo,
+      extendHistory: extendHistory.map((item) => ({
+        NgayGiaHan: item.NgayGiaHan,
+        PhiGiaHan: item.PhiGiaHan,
+      })),
+      reissueHistory: reissueHistory.map((item) => ({
+        NgayYeuCau: item.NgayYeuCau,
+        NgayDuyet: item.NgayDuyet,
+        NgayCapLai: item.NgayCapLai,
+        PhiCapLai: item.PhiCapLai,
+        TrangThai: item.TrangThai,
+      })),
+    };
+  } catch (error) {
+    console.error("Lỗi trong service updateOneLibraryCardStudent:", error);
+    throw error;
+  }
+}
+
+async function updateOneLibraryCardLecturer(cardId, updateData) {
+  try {
+    const { HoLot, Ten, MaBoMon } = updateData;
+
+    // Tìm thẻ thư viện
+    const card = await TheThuVien.findById(cardId).populate("DocGia");
+    if (!card) {
+      throw new Error("Không tìm thấy thẻ thư viện");
+    }
+
+    // Kiểm tra xem có phải thẻ giảng viên không
+    if (card.DocGia.DoiTuong !== "Giảng viên") {
+      throw new Error("Thẻ này không phải của giảng viên");
+    }
+
+    // Kiểm tra bộ môn có tồn tại không
+    const boMon = await BoMon.findById(MaBoMon).populate("MaKhoa");
+    if (!boMon) {
+      throw new Error("Bộ môn không tồn tại");
+    }
+
+    // Cập nhật thông tin độc giả
+    await DocGia.findByIdAndUpdate(
+      card.DocGia._id,
+      {
+        HoLot: HoLot.trim(),
+        Ten: Ten.trim(),
+      },
+      { new: true, runValidators: true }
+    );
+
+    // Cập nhật thông tin giảng viên
+    await GiangVien.findOneAndUpdate(
+      { MaDocGia: card.DocGia._id },
+      {
+        MaBoMon: MaBoMon,
+      },
+      { new: true, runValidators: true }
+    );
+
+    // Lấy thông tin đầy đủ sau khi cập nhật
+    const updatedCard = await TheThuVien.findById(cardId)
+      .populate({
+        path: "DocGia",
+        select: "HoLot Ten MaDocGia NgaySinh Phai DiaChi DienThoai DoiTuong",
+      });
+
+    const lecturerInfo = await GiangVien.findOne({ MaDocGia: card.DocGia._id })
+      .populate({
+        path: "MaBoMon",
+        select: "TenBoMon MaKhoa",
+        populate: {
+          path: "MaKhoa",
+          select: "TenKhoa",
+        },
+      });
+
+    const extendHistory = await ThongTinGiaHan.find({
+      MaThe: cardId,
+    }).sort({
+      NgayGiaHan: -1,
+    });
+
+    const reissueHistory = await ThongTinCapLaiThe.find({
+      MaThe: cardId,
+    }).sort({
+      NgayYeuCau: -1,
+    });
+
+    return {
+      ...updatedCard.toObject(),
+      additionalInfo: lecturerInfo,
+      extendHistory: extendHistory.map((item) => ({
+        NgayGiaHan: item.NgayGiaHan,
+        PhiGiaHan: item.PhiGiaHan,
+      })),
+      reissueHistory: reissueHistory.map((item) => ({
+        NgayYeuCau: item.NgayYeuCau,
+        NgayDuyet: item.NgayDuyet,
+        NgayCapLai: item.NgayCapLai,
+        PhiCapLai: item.PhiCapLai,
+        TrangThai: item.TrangThai,
+      })),
+    };
+  } catch (error) {
+    console.error("Lỗi trong service updateOneLibraryCardLecturer:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   getLibraryCard,
   createLibraryCard,
@@ -955,5 +1137,8 @@ module.exports = {
   updateCardRule,
   getAllLibraryCards,
   uploadLibraryCardsExcelForLecturers,
-  uploadLibraryCardsExcelForStudents
+  uploadLibraryCardsExcelForStudents,
+
+  updateOneLibraryCardStudent,
+  updateOneLibraryCardLecturer
 };

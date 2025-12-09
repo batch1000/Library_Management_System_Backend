@@ -88,7 +88,15 @@ const {
   deleteOneReportStatistic,
   getAllReportStatistic,
 
-  getAllNXB
+  getAllNXB,
+
+  getAllNienLuanForAdmin,
+  getAllDotNopForAdmin,
+  getStatisticsByDot,
+
+  getAllNganhHoc,
+  getAllGiangVienForAdmin,
+  getAllBoMon
 } = require("./book.controller");
 
 const router = express.Router();
@@ -246,5 +254,13 @@ router.delete("/deleteOneReportStatistic", deleteOneReportStatistic);
 router.get("/getAllReportStatistic", getAllReportStatistic);
 
 router.get("/getAllNXB", getAllNXB);
+
+router.get("/getAllNienLuanForAdmin", getAllNienLuanForAdmin);
+router.get("/getAllDotNopForAdmin", getAllDotNopForAdmin);
+router.get("/getStatisticsByDot", getStatisticsByDot);
+
+router.get("/getAllNganhHoc", getAllNganhHoc);
+router.get("/getAllGiangVienForAdmin",  getAllGiangVienForAdmin);
+router.get("/getAllBoMon", getAllBoMon);
 
 module.exports = router;

@@ -223,6 +223,78 @@ async function uploadLibraryCardsExcelForStudents(req, res) {
   }
 }
 
+async function updateOneLibraryCardStudent(req, res) {
+  try {
+    const { cardId } = req.params;
+    const { HoLot, Ten, MaNganhHoc } = req.body;
+
+    // Validate input
+    if (!HoLot || !Ten || !MaNganhHoc) {
+      return res.status(400).json({
+        message: "Vui lòng cung cấp đầy đủ thông tin: Họ lót, Tên, Mã ngành học",
+      });
+    }
+
+    const updatedCard = await libraryService.updateOneLibraryCardStudent(
+      cardId,
+      { HoLot, Ten, MaNganhHoc }
+    );
+
+    if (!updatedCard) {
+      return res.status(404).json({
+        message: "Không tìm thấy thẻ thư viện hoặc không phải thẻ sinh viên",
+      });
+    }
+
+    res.json({
+      message: "Cập nhật thông tin thẻ sinh viên thành công",
+      data: updatedCard,
+    });
+  } catch (error) {
+    console.error("Lỗi khi cập nhật thông tin thẻ sinh viên:", error);
+    res.status(500).json({
+      message: "Cập nhật thông tin thẻ sinh viên thất bại",
+      error: error.message,
+    });
+  }
+}
+
+async function updateOneLibraryCardLecturer(req, res) {
+  try {
+    const { cardId } = req.params;
+    const { HoLot, Ten, MaBoMon } = req.body;
+
+    // Validate input
+    if (!HoLot || !Ten || !MaBoMon) {
+      return res.status(400).json({
+        message: "Vui lòng cung cấp đầy đủ thông tin: Họ lót, Tên, Mã bộ môn",
+      });
+    }
+
+    const updatedCard = await libraryService.updateOneLibraryCardLecturer(
+      cardId,
+      { HoLot, Ten, MaBoMon }
+    );
+
+    if (!updatedCard) {
+      return res.status(404).json({
+        message: "Không tìm thấy thẻ thư viện hoặc không phải thẻ giảng viên",
+      });
+    }
+
+    res.json({
+      message: "Cập nhật thông tin thẻ giảng viên thành công",
+      data: updatedCard,
+    });
+  } catch (error) {
+    console.error("Lỗi khi cập nhật thông tin thẻ giảng viên:", error);
+    res.status(500).json({
+      message: "Cập nhật thông tin thẻ giảng viên thất bại",
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   getLibraryCard,
   getAllInfoExpireCard,
@@ -238,5 +310,8 @@ module.exports = {
   updateCardRule,
   getAllLibraryCards,
   uploadLibraryCardsExcelForLecturers,
-  uploadLibraryCardsExcelForStudents
+  uploadLibraryCardsExcelForStudents,
+
+  updateOneLibraryCardStudent,
+  updateOneLibraryCardLecturer
 };

@@ -20,10 +20,10 @@ const NienLuan = require("../../models/nienluanModel");
 const DotNopNienLuan = require("../../models/dotnopnienluanModel");
 const GiangVien = require("../../models/giangvienModel");
 const BoMon = require("../../models/bomonModel");
+const NganhHoc = require("../../models/nganhhocModel");
 
 const BaoCaoThongKe = require("../../models/baocaothongkeModel");
 const NhanVien = require("../../models/nhanvienModel");
-
 
 const notificationService = require("../notification/notification.service");
 
@@ -1550,32 +1550,42 @@ async function getTrendingBook(limit) {
   async function getPeriodData(start7d, end, start14d) {
     const views7dAgg = await TheoDoiXemSach.aggregate([
       { $match: { ThoiDiemXem: { $gte: start7d, $lt: end } } },
-      { $group: { _id: "$MaSach", views_7d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", views_7d: { $sum: 1 } } },
     ]);
 
     const borrows7dAgg = await TheoDoiMuonSach.aggregate([
-      { $match: { NgayMuon: { $gte: start7d, $lt: end }, TrangThai: { $in: ["approved", "returned"] } } },
-      { $group: { _id: "$MaSach", borrows_7d: { $sum: 1 } } }
+      {
+        $match: {
+          NgayMuon: { $gte: start7d, $lt: end },
+          TrangThai: { $in: ["approved", "returned"] },
+        },
+      },
+      { $group: { _id: "$MaSach", borrows_7d: { $sum: 1 } } },
     ]);
 
     const ratings7dAgg = await DanhGiaSach.aggregate([
       { $match: { NgayDanhGia: { $gte: start7d, $lt: end } } },
-      { $group: { _id: "$MaSach", ratings_7d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", ratings_7d: { $sum: 1 } } },
     ]);
 
     const views14dAgg = await TheoDoiXemSach.aggregate([
       { $match: { ThoiDiemXem: { $gte: start14d, $lt: end } } },
-      { $group: { _id: "$MaSach", views_14d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", views_14d: { $sum: 1 } } },
     ]);
 
     const borrows14dAgg = await TheoDoiMuonSach.aggregate([
-      { $match: { NgayMuon: { $gte: start14d, $lt: end }, TrangThai: { $in: ["approved", "returned"] } } },
-      { $group: { _id: "$MaSach", borrows_14d: { $sum: 1 } } }
+      {
+        $match: {
+          NgayMuon: { $gte: start14d, $lt: end },
+          TrangThai: { $in: ["approved", "returned"] },
+        },
+      },
+      { $group: { _id: "$MaSach", borrows_14d: { $sum: 1 } } },
     ]);
 
     const ratings14dAgg = await DanhGiaSach.aggregate([
       { $match: { NgayDanhGia: { $gte: start14d, $lt: end } } },
-      { $group: { _id: "$MaSach", ratings_14d: { $sum: 1 } } }
+      { $group: { _id: "$MaSach", ratings_14d: { $sum: 1 } } },
     ]);
 
     const scoreMap = new Map();
@@ -1588,19 +1598,31 @@ async function getTrendingBook(limit) {
           ratings_7d: 0,
           views_14d: 0,
           borrows_14d: 0,
-          ratings_14d: 0
+          ratings_14d: 0,
         });
       }
       return scoreMap.get(id);
     }
 
-    views7dAgg.forEach(d => ensureEntry(d._id.toString()).views_7d = d.views_7d);
-    borrows7dAgg.forEach(d => ensureEntry(d._id.toString()).borrows_7d = d.borrows_7d);
-    ratings7dAgg.forEach(d => ensureEntry(d._id.toString()).ratings_7d = d.ratings_7d);
+    views7dAgg.forEach(
+      (d) => (ensureEntry(d._id.toString()).views_7d = d.views_7d)
+    );
+    borrows7dAgg.forEach(
+      (d) => (ensureEntry(d._id.toString()).borrows_7d = d.borrows_7d)
+    );
+    ratings7dAgg.forEach(
+      (d) => (ensureEntry(d._id.toString()).ratings_7d = d.ratings_7d)
+    );
 
-    views14dAgg.forEach(d => ensureEntry(d._id.toString()).views_14d = d.views_14d);
-    borrows14dAgg.forEach(d => ensureEntry(d._id.toString()).borrows_14d = d.borrows_14d);
-    ratings14dAgg.forEach(d => ensureEntry(d._id.toString()).ratings_14d = d.ratings_14d);
+    views14dAgg.forEach(
+      (d) => (ensureEntry(d._id.toString()).views_14d = d.views_14d)
+    );
+    borrows14dAgg.forEach(
+      (d) => (ensureEntry(d._id.toString()).borrows_14d = d.borrows_14d)
+    );
+    ratings14dAgg.forEach(
+      (d) => (ensureEntry(d._id.toString()).ratings_14d = d.ratings_14d)
+    );
 
     const result = [];
 
@@ -1632,7 +1654,7 @@ async function getTrendingBook(limit) {
           views_14d: c.views_14d,
           borrows_14d: c.borrows_14d,
           ratings_14d: c.ratings_14d,
-          growth_rate: score
+          growth_rate: score,
         });
 
         processedBookIds.add(id);
@@ -1656,27 +1678,38 @@ async function getTrendingBook(limit) {
     tries++;
   }
 
-  const valid = allScoredBooks.filter(b => b.growth_rate > 0);
+  const valid = allScoredBooks.filter((b) => b.growth_rate > 0);
 
   // 🔥 FALLBACK: nếu 3 tháng không có hoạt động → lấy sách mới nhất
   if (valid.length === 0) {
-    const fallbackBooks = await Sach.find().select("MaSach TenSach TacGia Image").limit(limit).lean();
-    
+    const fallbackBooks = await Sach.find()
+      .select("MaSach TenSach TacGia Image")
+      .limit(limit)
+      .lean();
+
     // Lấy rating cho fallback books
-    const fallbackIds = fallbackBooks.map(b => b._id);
+    const fallbackIds = fallbackBooks.map((b) => b._id);
     const fallbackRatings = await DanhGiaSach.aggregate([
       { $match: { MaSach: { $in: fallbackIds } } },
-      { $group: { _id: "$MaSach", avgRating: { $avg: "$SoSao" }, totalRatings: { $sum: 1 } } }
+      {
+        $group: {
+          _id: "$MaSach",
+          avgRating: { $avg: "$SoSao" },
+          totalRatings: { $sum: 1 },
+        },
+      },
     ]);
-    
+
     const fallbackRateMap = new Map();
-    fallbackRatings.forEach(r => fallbackRateMap.set(r._id.toString(), r));
-    
-    return fallbackBooks.map(book => ({
+    fallbackRatings.forEach((r) => fallbackRateMap.set(r._id.toString(), r));
+
+    return fallbackBooks.map((book) => ({
       ...book,
-      SoSaoTB: fallbackRateMap.has(book._id.toString()) 
-        ? parseFloat(fallbackRateMap.get(book._id.toString()).avgRating.toFixed(1)) 
-        : 0
+      SoSaoTB: fallbackRateMap.has(book._id.toString())
+        ? parseFloat(
+            fallbackRateMap.get(book._id.toString()).avgRating.toFixed(1)
+          )
+        : 0,
     }));
   }
 
@@ -1684,23 +1717,29 @@ async function getTrendingBook(limit) {
 
   const top = limit ? valid.slice(0, limit) : valid;
 
-  const ids = top.map(x => mongoose.Types.ObjectId(x.bookIdStr));
+  const ids = top.map((x) => mongoose.Types.ObjectId(x.bookIdStr));
   const docs = await Sach.find({ _id: { $in: ids } })
     .select("MaSach TenSach TacGia Image")
     .lean();
 
   const map = new Map();
-  docs.forEach(d => map.set(d._id.toString(), d));
+  docs.forEach((d) => map.set(d._id.toString(), d));
 
   const ratings = await DanhGiaSach.aggregate([
     { $match: { MaSach: { $in: ids } } },
-    { $group: { _id: "$MaSach", avgRating: { $avg: "$SoSao" }, totalRatings: { $sum: 1 } } }
+    {
+      $group: {
+        _id: "$MaSach",
+        avgRating: { $avg: "$SoSao" },
+        totalRatings: { $sum: 1 },
+      },
+    },
   ]);
 
   const rateMap = new Map();
-  ratings.forEach(r => rateMap.set(r._id.toString(), r));
+  ratings.forEach((r) => rateMap.set(r._id.toString(), r));
 
-  return top.map(item => {
+  return top.map((item) => {
     const doc = map.get(item.bookIdStr);
     const r = rateMap.get(item.bookIdStr);
 
@@ -1714,7 +1753,7 @@ async function getTrendingBook(limit) {
       borrows_7d: item.borrows_7d,
       ratings_7d: item.ratings_7d,
       growth_rate: parseFloat(item.growth_rate.toFixed(3)),
-      SoSaoTB: r ? parseFloat(r.avgRating.toFixed(1)) : 0
+      SoSaoTB: r ? parseFloat(r.avgRating.toFixed(1)) : 0,
     };
   });
 }
@@ -1725,16 +1764,16 @@ async function getPopularBook(limit) {
   }
 
   const viewsAgg = await TheoDoiXemSach.aggregate([
-    { $group: { _id: "$MaSach", views: { $sum: 1 } } }
+    { $group: { _id: "$MaSach", views: { $sum: 1 } } },
   ]);
 
   const borrowsAgg = await TheoDoiMuonSach.aggregate([
     { $match: { TrangThai: { $in: ["approved", "returned"] } } },
-    { $group: { _id: "$MaSach", borrows: { $sum: 1 } } }
+    { $group: { _id: "$MaSach", borrows: { $sum: 1 } } },
   ]);
 
   const ratingsAgg = await DanhGiaSach.aggregate([
-    { $group: { _id: "$MaSach", ratings: { $sum: 1 } } }
+    { $group: { _id: "$MaSach", ratings: { $sum: 1 } } },
   ]);
 
   const scoreMap = new Map();
@@ -1746,42 +1785,61 @@ async function getPopularBook(limit) {
     return scoreMap.get(id);
   }
 
-  viewsAgg.forEach(d => ensureEntry(d._id.toString()).views = d.views);
-  borrowsAgg.forEach(d => ensureEntry(d._id.toString()).borrows = d.borrows);
-  ratingsAgg.forEach(d => ensureEntry(d._id.toString()).ratings = d.ratings);
+  viewsAgg.forEach((d) => (ensureEntry(d._id.toString()).views = d.views));
+  borrowsAgg.forEach(
+    (d) => (ensureEntry(d._id.toString()).borrows = d.borrows)
+  );
+  ratingsAgg.forEach(
+    (d) => (ensureEntry(d._id.toString()).ratings = d.ratings)
+  );
 
   const scored = [];
   for (const [id, c] of scoreMap.entries()) {
     const s = 0.2 * c.views + 0.5 * c.borrows + 0.3 * c.ratings;
-    scored.push({ bookIdStr: id, views: c.views, borrows: c.borrows, ratings: c.ratings, score: s });
+    scored.push({
+      bookIdStr: id,
+      views: c.views,
+      borrows: c.borrows,
+      ratings: c.ratings,
+      score: s,
+    });
   }
 
   // 🔥 FALLBACK: nếu thư viện ngủ yên 3 tháng → score = 0 hết nhưng vẫn trả sách
   if (scored.length === 0) {
-    return await Sach.find().select("MaSach TenSach TacGia Image DonGia").limit(limit).lean();
+    return await Sach.find()
+      .select("MaSach TenSach TacGia Image DonGia")
+      .limit(limit)
+      .lean();
   }
 
   scored.sort((a, b) => b.score - a.score);
 
   const top = limit ? scored.slice(0, limit) : scored;
-  const ids = top.map(x => mongoose.Types.ObjectId(x.bookIdStr));
+  const ids = top.map((x) => mongoose.Types.ObjectId(x.bookIdStr));
 
   const docs = await Sach.find({ _id: { $in: ids } })
     .select("MaSach TenSach TacGia Image DonGia")
     .lean();
 
   const map = new Map();
-  docs.forEach(d => map.set(d._id.toString(), d));
+  docs.forEach((d) => map.set(d._id.toString(), d));
 
   const ratings = await DanhGiaSach.aggregate([
     { $match: { MaSach: { $in: ids } } },
-    { $group: { _id: "$MaSach", avgRating: { $avg: "$SoSao" }, totalRatings: { $sum: 1 } } }
+    {
+      $group: {
+        _id: "$MaSach",
+        avgRating: { $avg: "$SoSao" },
+        totalRatings: { $sum: 1 },
+      },
+    },
   ]);
 
   const rateMap = new Map();
-  ratings.forEach(r => rateMap.set(r._id.toString(), r));
+  ratings.forEach((r) => rateMap.set(r._id.toString(), r));
 
-  return top.map(item => {
+  return top.map((item) => {
     const doc = map.get(item.bookIdStr);
     const r = rateMap.get(item.bookIdStr);
 
@@ -1796,7 +1854,7 @@ async function getPopularBook(limit) {
       borrows: item.borrows,
       ratings: item.ratings,
       score: parseFloat(item.score.toFixed(3)),
-      SoSaoTB: r ? parseFloat(r.avgRating.toFixed(1)) : 0
+      SoSaoTB: r ? parseFloat(r.avgRating.toFixed(1)) : 0,
     };
   });
 }
@@ -2679,6 +2737,41 @@ async function getAllGiangVien() {
   }
 }
 
+async function getAllGiangVienForAdmin() {
+  try {
+    const docGiaList = await DocGia.find({ DoiTuong: "Giảng viên" })
+      .select("_id HoLot Ten")
+      .lean();
+
+    const result = await Promise.all(
+      docGiaList.map(async (docGia) => {
+        const giangVien = await GiangVien.findOne({ MaDocGia: docGia._id })
+          .populate({
+            path: 'MaBoMon',
+            populate: {
+              path: 'MaKhoa',
+              select: 'TenKhoa'
+            }
+          })
+          .select("MaCanBo HocVi MaBoMon")
+          .lean();
+
+        return {
+          _id: docGia._id,
+          HoLot: docGia.HoLot,
+          Ten: docGia.Ten,
+          GiangVien: giangVien,
+        };
+      })
+    );
+
+    return result.filter((item) => item.GiangVien !== null);
+  } catch (err) {
+    console.error("Lỗi khi lấy danh sách giảng viên admin:", err);
+    throw err;
+  }
+}
+
 async function getAllActiveDotNopNienLuan(maDocGia) {
   try {
     // Lấy thông tin sinh viên để biết khoa
@@ -2798,7 +2891,8 @@ async function getStatisticBook() {
     const result = await TheoDoiMuonSach.find()
       .populate({
         path: "MaSach",
-        select: "MaSach TenSach DonGia SoQuyen NamXuatBan TacGia Image MaTheLoai LoaiSach Khoa", // thêm Khoa
+        select:
+          "MaSach TenSach DonGia SoQuyen NamXuatBan TacGia Image MaTheLoai LoaiSach Khoa", // thêm Khoa
         populate: [
           {
             path: "MaTheLoai",
@@ -2827,7 +2921,6 @@ async function getStatisticBook() {
   }
 }
 
-
 //Report Statistic
 async function submitFilePdfReportStatistic(data) {
   try {
@@ -2854,29 +2947,29 @@ async function submitFilePdfReportStatistic(data) {
   }
 }
 
-async function submitFileExcelReportStatistic(data) { 
-  try { 
-    // Kiểm tra nhân viên tồn tại 
-    const nhanVien = await NhanVien.findById(data.NguoiNop).exec(); 
-    if (!nhanVien) { 
-      throw new Error("Không tìm thấy nhân viên nộp báo cáo"); 
-    } 
- 
+async function submitFileExcelReportStatistic(data) {
+  try {
+    // Kiểm tra nhân viên tồn tại
+    const nhanVien = await NhanVien.findById(data.NguoiNop).exec();
+    if (!nhanVien) {
+      throw new Error("Không tìm thấy nhân viên nộp báo cáo");
+    }
+
     // Tạo mới báo cáo (logic giống PDF)
-    const newReport = new BaoCaoThongKe({ 
-      TieuDe: data.TieuDe, 
-      NguoiNop: nhanVien._id, 
-      LoaiBaoCao: data.LoaiBaoCao, 
-      TepDinhKem: data.TepDinhKem, 
-      TrangThai: "Đã nộp", 
-    }); 
- 
-    const savedReport = await newReport.save(); 
-    return savedReport; 
-  } catch (err) { 
-    console.error("Lỗi khi lưu báo cáo Excel:", err); 
-    throw err; 
-  } 
+    const newReport = new BaoCaoThongKe({
+      TieuDe: data.TieuDe,
+      NguoiNop: nhanVien._id,
+      LoaiBaoCao: data.LoaiBaoCao,
+      TepDinhKem: data.TepDinhKem,
+      TrangThai: "Đã nộp",
+    });
+
+    const savedReport = await newReport.save();
+    return savedReport;
+  } catch (err) {
+    console.error("Lỗi khi lưu báo cáo Excel:", err);
+    throw err;
+  }
 }
 
 async function getReportStatisticByReporter(NguoiNop) {
@@ -2908,7 +3001,9 @@ async function deleteOneReportStatistic(reportId) {
       return null;
     }
 
-    const deletedReport = await BaoCaoThongKe.findByIdAndDelete(reportId).exec();
+    const deletedReport = await BaoCaoThongKe.findByIdAndDelete(
+      reportId
+    ).exec();
 
     return deletedReport;
   } catch (err) {
@@ -2939,6 +3034,144 @@ async function getAllNXB() {
   } catch (err) {
     console.error("Lỗi khi truy vấn tất cả nhà xuất bản:", err);
     throw err;
+  }
+}
+
+async function getAllNienLuanForAdmin() {
+  return await NienLuan.find({ TrangThai: "Đã duyệt" })
+    .populate({
+      path: "MaDocGia",
+      select: "HoLot Ten",
+      populate: {
+        path: "SinhVien",
+        select: "MaSinhVien MaNganhHoc",
+        populate: {
+          path: "MaNganhHoc",
+          select: "TenNganh Khoa",
+          populate: {
+            path: "Khoa",
+            select: "TenKhoa",
+          },
+        },
+      },
+    })
+    .populate({
+      path: "MaDotNop",
+      select: "TenDot KyHoc NamHoc MaGiangVien",
+      populate: [
+        { path: "KyHoc", select: "TenKyHoc" },
+        { path: "NamHoc", select: "TenNamHoc" },
+        {
+          path: "MaGiangVien",
+          select: "HoLot Ten",
+          populate: {
+            path: "GiangVien",
+            select: "HocVi MaBoMon",
+            populate: {
+              path: "MaBoMon",
+              select: "TenBoMon MaKhoa",
+              populate: {
+                path: "MaKhoa",
+                select: "TenKhoa",
+              },
+            },
+          },
+        },
+      ],
+    })
+    .sort({ NgayNop: -1 })
+    .lean();
+}
+
+async function getAllDotNopForAdmin() {
+  return await DotNopNienLuan.find()
+    .populate("KyHoc", "TenKyHoc")
+    .populate("NamHoc", "TenNamHoc")
+    .populate({
+      path: "MaGiangVien",
+      select: "HoLot Ten",
+      populate: {
+        path: "GiangVien",
+        select: "HocVi MaBoMon",
+        populate: {
+          path: "MaBoMon",
+          select: "TenBoMon MaKhoa",
+          populate: {
+            path: "MaKhoa",
+            select: "TenKhoa",
+          },
+        },
+      },
+    })
+    .sort({ ThoiGianMoNop: -1 })
+    .lean();
+}
+
+async function getStatisticsByDot() {
+  const dots = await DotNopNienLuan.find()
+    .populate("KyHoc", "TenKyHoc")
+    .populate("NamHoc", "TenNamHoc")
+    .populate({
+      path: "MaGiangVien",
+      select: "HoLot Ten",
+      populate: {
+        path: "GiangVien",
+        select: "HocVi MaBoMon",
+        populate: {
+          path: "MaBoMon",
+          populate: { path: "MaKhoa", select: "TenKhoa" },
+        },
+      },
+    })
+    .lean();
+  const result = await Promise.all(
+    dots.map(async (dot) => {
+      const essays = await NienLuan.find({ MaDotNop: dot._id });
+      const daDuyet = essays.filter((e) => e.TrangThai === "Đã duyệt").length;
+      const choDuyet = essays.filter((e) => e.TrangThai === "Chờ duyệt").length;
+      const tuChoi = essays.filter((e) => e.TrangThai === "Từ chối").length;
+      const tyLeHoanThanh =
+        dot.SoLuongPhaiNop > 0
+          ? parseFloat(((daDuyet / dot.SoLuongPhaiNop) * 100).toFixed(2))
+          : 0;
+      return {
+        ...dot,
+        tongDaNop: daDuyet,
+        daDuyet,
+        choDuyet,
+        tuChoi,
+        tyLeHoanThanh,
+      };
+    })
+  );
+  return result;
+}
+
+async function getAllNganhHoc() {
+  try {
+    const result = await NganhHoc.find()
+      .populate("Khoa", "TenKhoa")
+      .select("TenNganh Khoa")
+      .lean();
+
+    return result;
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách ngành học:", error);
+    throw error;
+  }
+}
+
+async function getAllBoMon() {
+  try {
+    const result = await BoMon.find()
+      .populate("MaKhoa", "TenKhoa")
+      .select("TenBoMon MaKhoa")
+      .lean();
+
+    return result;
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách bộ môn:", error);
+    throw error;
   }
 }
 
@@ -3028,5 +3261,13 @@ module.exports = {
   deleteOneReportStatistic,
   getAllReportStatistic,
 
-  getAllNXB
+  getAllNXB,
+
+  getAllNienLuanForAdmin,
+  getAllDotNopForAdmin,
+  getStatisticsByDot,
+
+  getAllNganhHoc,
+  getAllGiangVienForAdmin,
+  getAllBoMon
 };

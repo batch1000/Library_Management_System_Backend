@@ -17,8 +17,10 @@ const
         updateCardRule,
         getAllLibraryCards,
         uploadLibraryCardsExcelForLecturers,
-        uploadLibraryCardsExcelForStudents
+        uploadLibraryCardsExcelForStudents,
 
+        updateOneLibraryCardStudent,
+        updateOneLibraryCardLecturer
     } = require('./library.controller')
 
 const router = express.Router();
@@ -40,5 +42,8 @@ router.post("/updateCardRule", updateCardRule)
 router.get("/getAllLibraryCards", getAllLibraryCards)
 router.post("/uploadLibraryCardsExcelForLecturers", uploadExcel.single('file'), uploadLibraryCardsExcelForLecturers);
 router.post("/uploadLibraryCardsExcelForStudents", uploadExcel.single('file'), uploadLibraryCardsExcelForStudents);
+
+router.put("/updateOneLibraryCardStudent/:cardId", updateOneLibraryCardStudent);
+router.put("/updateOneLibraryCardLecturer/:cardId", updateOneLibraryCardLecturer);
 
 module.exports = router;

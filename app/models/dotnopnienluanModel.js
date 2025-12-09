@@ -24,6 +24,12 @@ const DotNopNienLuanSchema = new mongoose.Schema(
       default: "Chưa mở",
     },
 
+    SoLuongPhaiNop: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
     KyHoc: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "KyHoc",
