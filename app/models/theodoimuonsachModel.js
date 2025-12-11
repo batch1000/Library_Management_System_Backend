@@ -121,6 +121,13 @@ const TheoDoiMuonSachSchema = new mongoose.Schema(
     ThongBaoNhacTra2Ngay: { type: Date, default: null },
     ThongBaoNhacTra1Ngay: { type: Date, default: null },
     ThongBaoNhacTraHomNay: { type: Date, default: null },
+
+    MaPhieuMuon: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "PhieuMuon",
+      required: true, 
+      default: null,
+    },
   },
   {
     timestamps: true,

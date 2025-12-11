@@ -96,7 +96,13 @@ const {
 
   getAllNganhHoc,
   getAllGiangVienForAdmin,
-  getAllBoMon
+  getAllBoMon,
+
+  addBookIntoShelf,
+  getAllBooksOnShelf,
+  removeBookFromShelf,
+  checkBookInShelf,
+  createBorrowingSlip
 } = require("./book.controller");
 
 const router = express.Router();
@@ -262,5 +268,12 @@ router.get("/getStatisticsByDot", getStatisticsByDot);
 router.get("/getAllNganhHoc", getAllNganhHoc);
 router.get("/getAllGiangVienForAdmin",  getAllGiangVienForAdmin);
 router.get("/getAllBoMon", getAllBoMon);
+
+
+router.post("/addBookIntoShelf", addBookIntoShelf);
+router.get("/getAllBooksOnShelf/:MaDocGia", getAllBooksOnShelf);
+router.post("/removeBookFromShelf", removeBookFromShelf);
+router.post("/checkBookInShelf", checkBookInShelf);
+router.post("/createBorrowingSlip", createBorrowingSlip);
 
 module.exports = router;

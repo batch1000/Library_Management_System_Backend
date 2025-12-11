@@ -1895,6 +1895,126 @@ async function getAllBoMon(req, res) {
   }
 }
 
+async function addBookIntoShelf(req, res) {
+  try {
+    const { MaSach, MaDocGia } = req.body;
+
+    // Trim để tránh dữ liệu rác
+    const bookId = MaSach.trim();
+    const readerId = MaDocGia.trim();
+
+    const result = await bookService.addBookIntoShelf(bookId, readerId);
+
+    if (!result) {
+      console.log("Thêm sách vào tủ sách thất bại (đã tồn tại):", {
+        MaSach: bookId,
+        MaDocGia: readerId,
+      });
+      return res.status(500).send("Thêm sách vào tủ sách thất bại");
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi thêm sách vào tủ sách:", error);
+    res.status(500).send("Thêm sách vào tủ sách thất bại");
+  }
+}
+
+async function getAllBooksOnShelf(req, res) {
+  try {
+    const { MaDocGia } = req.params;
+
+    const readerId = MaDocGia.trim();
+
+    const result = await bookService.getAllBooksOnShelf(readerId);
+
+    if (!result) {
+      console.log("Không tìm thấy tủ sách của độc giả:", { MaDocGia: readerId });
+      return res.status(404).send("Không tìm thấy tủ sách");
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách sách trong tủ:", error);
+    res.status(500).send("Lấy danh sách sách thất bại");
+  }
+}
+
+async function removeBookFromShelf(req, res) {
+  try {
+    const { MaSach, MaDocGia } = req.body;
+    const bookId = MaSach.trim();
+    const readerId = MaDocGia.trim();
+
+    const result = await bookService.removeBookFromShelf(bookId, readerId);
+
+    if (!result) {
+      return res.status(404).send("Không tìm thấy sách trong tủ");
+    }
+
+    res.json({ success: true, message: "Xóa sách khỏi tủ thành công" });
+  } catch (error) {
+    console.error("Lỗi khi xóa sách khỏi tủ:", error);
+    res.status(500).send("Xóa sách thất bại");
+  }
+}
+
+async function checkBookInShelf(req, res) {
+  try {
+    const { MaSach, MaDocGia } = req.body;
+    const bookId = MaSach.trim();
+    const readerId = MaDocGia.trim();
+
+    const exists = await bookService.checkBookInShelf(bookId, readerId);
+
+    res.json({ exists });
+  } catch (error) {
+    console.error("Lỗi khi kiểm tra sách trong tủ:", error);
+    res.status(500).send("Kiểm tra thất bại");
+  }
+}
+
+async function createBorrowingSlip(req, res) {
+  try {
+    const { MaDocGia, books } = req.body;
+
+    // Validate
+    if (!MaDocGia || !books || !Array.isArray(books) || books.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Dữ liệu không hợp lệ. Cần MaDocGia và danh sách sách.",
+      });
+    }
+
+    // Extract book IDs
+    const bookIds = books.map((book) => book.MaSach).filter((id) => id);
+
+    if (bookIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Danh sách sách trống",
+      });
+    }
+
+    const readerId = MaDocGia.trim();
+
+    const result = await bookService.createBorrowingSlip(readerId, bookIds);
+
+    res.json({
+      success: true,
+      message: `Đăng ký mượn ${result.totalBooks} cuốn sách thành công`,
+      data: result,
+    });
+  } catch (error) {
+    console.error("Lỗi khi tạo phiếu mượn:", error);
+    res.status(500).json({
+      success: false,
+      message: "Tạo phiếu mượn thất bại",
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   addBook,
   getAllBook,
@@ -1990,5 +2110,11 @@ module.exports = {
 
   getAllNganhHoc,
   getAllGiangVienForAdmin,
-  getAllBoMon
+  getAllBoMon,
+
+  addBookIntoShelf,
+  getAllBooksOnShelf,
+  removeBookFromShelf,
+  checkBookInShelf,
+  createBorrowingSlip
 };
