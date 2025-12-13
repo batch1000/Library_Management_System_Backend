@@ -429,6 +429,17 @@ async function lendBook(req, res) {
   try {
     const data = req.body;
     const result = await bookService.lendBook(data);
+    
+    // THÊM: Xử lý trường hợp sách đang được mượn
+    if (result && !result.success && result.error === 'BOOK_ALREADY_BORROWED') {
+      return res.status(400).json({
+        success: false,
+        error: result.error,
+        message: result.message,
+        currentStatus: result.currentStatus
+      });
+    }
+    
     res.json(result);
   } catch (error) {
     console.error("Lỗi khi đăng ký mượn sách:", error);
@@ -1101,8 +1112,8 @@ async function addThesis(req, res) {
     // ✅ THÊM: Kiểm tra đợt nộp đang mở
     const activeDotNop = await bookService.getActiveDotNop();
     if (!activeDotNop) {
-      return res.status(400).json({ 
-        error: "Hiện tại không có đợt nộp luận văn nào đang mở" 
+      return res.status(400).json({
+        error: "Hiện tại không có đợt nộp luận văn nào đang mở",
       });
     }
 
@@ -1212,9 +1223,23 @@ async function rejectThesis(req, res) {
 // 1. Tạo đợt nộp luận văn
 async function createDotNop(req, res) {
   try {
-    const { TenDot, ThoiGianMoNop, ThoiGianDongNop, KyHoc, NamHoc, SoLuongPhaiNop } = req.body;
+    const {
+      TenDot,
+      ThoiGianMoNop,
+      ThoiGianDongNop,
+      KyHoc,
+      NamHoc,
+      SoLuongPhaiNop,
+    } = req.body;
 
-    if (!TenDot || !ThoiGianMoNop || !ThoiGianDongNop || !KyHoc || !NamHoc || !SoLuongPhaiNop) {
+    if (
+      !TenDot ||
+      !ThoiGianMoNop ||
+      !ThoiGianDongNop ||
+      !KyHoc ||
+      !NamHoc ||
+      !SoLuongPhaiNop
+    ) {
       return res.status(400).json({ error: "Vui lòng điền đầy đủ thông tin" });
     }
 
@@ -1348,7 +1373,9 @@ async function addNamHoc(req, res) {
     // Kiểm tra định dạng năm học (VD: 2023-2024)
     const namHocPattern = /^\d{4}-\d{4}$/;
     if (!namHocPattern.test(TenNamHoc)) {
-      return res.status(400).json({ error: "Định dạng năm học không hợp lệ. VD: 2023-2024" });
+      return res
+        .status(400)
+        .json({ error: "Định dạng năm học không hợp lệ. VD: 2023-2024" });
     }
 
     const result = await bookService.addNamHoc(TenNamHoc);
@@ -1363,7 +1390,6 @@ async function addNamHoc(req, res) {
   }
 }
 
-
 // 1. Sinh viên nộp niên luận
 async function addNienLuan(req, res) {
   try {
@@ -1374,7 +1400,9 @@ async function addNienLuan(req, res) {
     const pdfFile = files && files.pdfFile ? files.pdfFile[0] : null;
 
     if (!pdfFile) {
-      return res.status(400).json({ error: "Vui lòng chọn file PDF niên luận" });
+      return res
+        .status(400)
+        .json({ error: "Vui lòng chọn file PDF niên luận" });
     }
 
     // ✅ KIỂM TRA MÃ ĐỢT NỘP
@@ -1399,12 +1427,12 @@ async function addNienLuan(req, res) {
 
     const nienLuanData = {
       TenDeTai: body.topicName,
-      MaDocGia: body.userId,  // ✅ Sửa từ MaSV -> MaDocGia
+      MaDocGia: body.userId, // ✅ Sửa từ MaSV -> MaDocGia
       MaDotNop: body.maDotNop, // ✅ THÊM MÃ ĐỢT NỘP
       Pdf: pdfUrl,
       Image: imageUrl,
-      TrangThai: "Chờ duyệt",  // ✅ THÊM TRẠNG THÁI MẶC ĐỊNH
-      NgayNop: new Date()      // ✅ THÊM NGÀY NỘP
+      TrangThai: "Chờ duyệt", // ✅ THÊM TRẠNG THÁI MẶC ĐỊNH
+      NgayNop: new Date(), // ✅ THÊM NGÀY NỘP
     };
 
     const result = await bookService.addNienLuan(nienLuanData);
@@ -1436,9 +1464,25 @@ async function getOneNienLuan(req, res) {
 // 3. Tạo đợt nộp niên luận (Giảng viên)
 async function createDotNopNienLuan(req, res) {
   try {
-    const { TenDot, ThoiGianMoNop, ThoiGianDongNop, KyHoc, NamHoc, MaGiangVien, SoLuongPhaiNop } = req.body;
+    const {
+      TenDot,
+      ThoiGianMoNop,
+      ThoiGianDongNop,
+      KyHoc,
+      NamHoc,
+      MaGiangVien,
+      SoLuongPhaiNop,
+    } = req.body;
 
-    if (!TenDot || !ThoiGianMoNop || !ThoiGianDongNop || !KyHoc || !NamHoc || !MaGiangVien || !SoLuongPhaiNop) {
+    if (
+      !TenDot ||
+      !ThoiGianMoNop ||
+      !ThoiGianDongNop ||
+      !KyHoc ||
+      !NamHoc ||
+      !MaGiangVien ||
+      !SoLuongPhaiNop
+    ) {
       return res.status(400).json({ error: "Vui lòng điền đầy đủ thông tin" });
     }
 
@@ -1473,7 +1517,9 @@ async function getAllDotNopNienLuan(req, res) {
     res.json(result);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách đợt nộp niên luận:", error);
-    res.status(500).json({ error: "Lỗi server khi lấy danh sách đợt nộp niên luận" });
+    res
+      .status(500)
+      .json({ error: "Lỗi server khi lấy danh sách đợt nộp niên luận" });
   }
 }
 
@@ -1509,7 +1555,9 @@ async function deleteDotNopNienLuan(req, res) {
     console.log("Xóa đợt nộp niên luận thành công");
   } catch (error) {
     console.error("Lỗi khi xóa đợt nộp niên luận:", error);
-    res.status(500).json({ error: error.message || "Xóa đợt nộp niên luận thất bại" });
+    res
+      .status(500)
+      .json({ error: error.message || "Xóa đợt nộp niên luận thất bại" });
   }
 }
 
@@ -1526,7 +1574,9 @@ async function getActiveDotNopNienLuan(req, res) {
     res.json(result);
   } catch (error) {
     console.error("Lỗi khi lấy đợt nộp niên luận đang mở:", error);
-    res.status(500).json({ error: "Lỗi server khi lấy đợt nộp niên luận đang mở" });
+    res
+      .status(500)
+      .json({ error: "Lỗi server khi lấy đợt nộp niên luận đang mở" });
   }
 }
 
@@ -1623,12 +1673,14 @@ async function getAllActiveDotNopNienLuan(req, res) {
     if (!maDocGia) {
       return res.status(400).json({ error: "Thiếu mã độc giả" });
     }
-    
+
     const result = await bookService.getAllActiveDotNopNienLuan(maDocGia);
     res.json(result);
   } catch (error) {
     console.error("Lỗi khi lấy danh sách đợt nộp đang mở:", error);
-    res.status(500).json({ error: "Lỗi server khi lấy danh sách đợt nộp đang mở" });
+    res
+      .status(500)
+      .json({ error: "Lỗi server khi lấy danh sách đợt nộp đang mở" });
   }
 }
 
@@ -1655,7 +1707,6 @@ async function getStatisticBook(req, res) {
   }
 }
 
-
 //Report Statistic
 async function submitFilePdfReportStatistic(req, res) {
   try {
@@ -1669,7 +1720,9 @@ async function submitFilePdfReportStatistic(req, res) {
 
     // Kiểm tra loại báo cáo
     if (!body.LoaiBaoCao) {
-      return res.status(400).send("Vui lòng chọn loại báo cáo (Ngày, Tuần, Tháng, Quý, Năm)");
+      return res
+        .status(400)
+        .send("Vui lòng chọn loại báo cáo (Ngày, Tuần, Tháng, Quý, Năm)");
     }
 
     // Upload file PDF lên Cloudinary
@@ -1698,65 +1751,70 @@ async function submitFilePdfReportStatistic(req, res) {
   }
 }
 
-async function submitFileExcelReportStatistic(req, res) { 
-  try { 
-    const body = req.body; 
-    const file = req.file; 
- 
-    // Kiểm tra file bắt buộc 
-    if (!file) { 
-      return res.status(400).send("Vui lòng chọn file báo cáo (Excel)"); 
-    } 
- 
-    // Kiểm tra loại báo cáo 
-    if (!body.LoaiBaoCao) { 
-      return res.status(400).send("Vui lòng chọn loại báo cáo (Ngày, Tuần, Tháng, Quý, Năm)"); 
-    } 
- 
+async function submitFileExcelReportStatistic(req, res) {
+  try {
+    const body = req.body;
+    const file = req.file;
+
+    // Kiểm tra file bắt buộc
+    if (!file) {
+      return res.status(400).send("Vui lòng chọn file báo cáo (Excel)");
+    }
+
+    // Kiểm tra loại báo cáo
+    if (!body.LoaiBaoCao) {
+      return res
+        .status(400)
+        .send("Vui lòng chọn loại báo cáo (Ngày, Tuần, Tháng, Quý, Năm)");
+    }
+
     // Đọc file từ disk vào buffer
-    const fs = require('fs');
+    const fs = require("fs");
     const fileBuffer = fs.readFileSync(file.path);
-    
-    // Upload file Excel lên Cloudinary 
-    const uploadResult = await uploadExcelToCloudinary(fileBuffer, file.originalname);
-    if (!uploadResult) { 
-      console.log("Lỗi khi upload báo cáo Excel lên cloud"); 
+
+    // Upload file Excel lên Cloudinary
+    const uploadResult = await uploadExcelToCloudinary(
+      fileBuffer,
+      file.originalname
+    );
+    if (!uploadResult) {
+      console.log("Lỗi khi upload báo cáo Excel lên cloud");
       // Xóa file tạm
       fs.unlinkSync(file.path);
-      return res.status(500).send("Lỗi khi upload báo cáo Excel"); 
-    } 
- 
+      return res.status(500).send("Lỗi khi upload báo cáo Excel");
+    }
+
     // Xóa file tạm sau khi upload thành công
     fs.unlinkSync(file.path);
- 
-    // Chuẩn bị dữ liệu báo cáo 
-    const reportData = { 
-      TieuDe: body.TieuDe, 
-      NguoiNop: body.NguoiNop, 
-      LoaiBaoCao: body.LoaiBaoCao, 
-      TepDinhKem: uploadResult.secure_url, 
-    }; 
- 
+
+    // Chuẩn bị dữ liệu báo cáo
+    const reportData = {
+      TieuDe: body.TieuDe,
+      NguoiNop: body.NguoiNop,
+      LoaiBaoCao: body.LoaiBaoCao,
+      TepDinhKem: uploadResult.secure_url,
+    };
+
     // Gọi service để lưu DB (có thể dùng chung service với PDF)
-    const result = await bookService.submitFileExcelReportStatistic(reportData); 
- 
-    res.json(result); 
-    console.log("Nộp báo cáo Excel thành công:", result._id); 
-  } catch (error) { 
+    const result = await bookService.submitFileExcelReportStatistic(reportData);
+
+    res.json(result);
+    console.log("Nộp báo cáo Excel thành công:", result._id);
+  } catch (error) {
     console.error("Lỗi khi nộp báo cáo Excel:", error);
-    
+
     // Xóa file tạm nếu có lỗi
     if (req.file && req.file.path) {
-      const fs = require('fs');
+      const fs = require("fs");
       try {
         fs.unlinkSync(req.file.path);
       } catch (unlinkError) {
         console.error("Lỗi khi xóa file tạm:", unlinkError);
       }
     }
-    
-    res.status(500).send("Nộp báo cáo thất bại"); 
-  } 
+
+    res.status(500).send("Nộp báo cáo thất bại");
+  }
 }
 
 async function getReportStatisticByReporter(req, res) {
@@ -1765,14 +1823,18 @@ async function getReportStatisticByReporter(req, res) {
 
     // Kiểm tra đầu vào
     if (!NguoiNop) {
-      return res.status(400).send("Thiếu thông tin người nộp báo cáo (NguoiNop)");
+      return res
+        .status(400)
+        .send("Thiếu thông tin người nộp báo cáo (NguoiNop)");
     }
 
     // Gọi service để lấy dữ liệu
     const reports = await bookService.getReportStatisticByReporter(NguoiNop);
 
     if (!reports || reports.length === 0) {
-      return res.status(404).send("Không tìm thấy báo cáo nào của nhân viên này");
+      return res
+        .status(404)
+        .send("Không tìm thấy báo cáo nào của nhân viên này");
     }
 
     res.json(reports);
@@ -1814,7 +1876,9 @@ async function getAllReportStatistic(req, res) {
     const reports = await bookService.getAllReportStatistic();
 
     if (!reports || reports.length === 0) {
-      return res.status(404).send("Không có báo cáo thống kê nào trong hệ thống");
+      return res
+        .status(404)
+        .send("Không có báo cáo thống kê nào trong hệ thống");
     }
     // console.log(reports);
     res.json(reports);
@@ -1834,7 +1898,6 @@ async function getAllNXB(req, res) {
   }
 }
 
-
 async function getAllNienLuanForAdmin(req, res) {
   try {
     const result = await bookService.getAllNienLuanForAdmin();
@@ -1842,7 +1905,7 @@ async function getAllNienLuanForAdmin(req, res) {
   } catch (error) {
     console.error("Lỗi khi lấy danh sách niên luận cho admin:", error);
     res.status(500).json({
-      error: "Lỗi server khi lấy danh sách niên luận cho admin"
+      error: "Lỗi server khi lấy danh sách niên luận cho admin",
     });
   }
 }
@@ -1854,7 +1917,7 @@ async function getAllDotNopForAdmin(req, res) {
   } catch (error) {
     console.error("Lỗi khi lấy danh sách đợt nộp cho admin:", error);
     res.status(500).json({
-      error: "Lỗi server khi lấy danh sách đợt nộp cho admin"
+      error: "Lỗi server khi lấy danh sách đợt nộp cho admin",
     });
   }
 }
@@ -1866,7 +1929,7 @@ async function getStatisticsByDot(req, res) {
   } catch (error) {
     console.error("Lỗi khi thống kê theo đợt nộp:", error);
     res.status(500).json({
-      error: "Lỗi server khi thống kê theo đợt nộp"
+      error: "Lỗi server khi thống kê theo đợt nộp",
     });
   }
 }
@@ -1878,7 +1941,7 @@ async function getAllNganhHoc(req, res) {
   } catch (error) {
     console.error("Lỗi khi lấy danh sách ngành học:", error);
     res.status(500).json({
-      error: "Lỗi server khi lấy danh sách ngành học"
+      error: "Lỗi server khi lấy danh sách ngành học",
     });
   }
 }
@@ -1890,7 +1953,7 @@ async function getAllBoMon(req, res) {
   } catch (error) {
     console.error("Lỗi khi lấy danh sách bộ môn:", error);
     res.status(500).json({
-      error: "Lỗi server khi lấy danh sách bộ môn"
+      error: "Lỗi server khi lấy danh sách bộ môn",
     });
   }
 }
@@ -1899,11 +1962,19 @@ async function addBookIntoShelf(req, res) {
   try {
     const { MaSach, MaDocGia } = req.body;
 
-    // Trim để tránh dữ liệu rác
     const bookId = MaSach.trim();
     const readerId = MaDocGia.trim();
 
     const result = await bookService.addBookIntoShelf(bookId, readerId);
+
+    // THÊM: Xử lý trường hợp sách đang được mượn
+    if (result && result.error === 'BOOK_IN_USE') {
+      return res.status(400).json({ 
+        success: false,
+        error: result.error,
+        message: result.message 
+      });
+    }
 
     if (!result) {
       console.log("Thêm sách vào tủ sách thất bại (đã tồn tại):", {
@@ -1929,7 +2000,9 @@ async function getAllBooksOnShelf(req, res) {
     const result = await bookService.getAllBooksOnShelf(readerId);
 
     if (!result) {
-      console.log("Không tìm thấy tủ sách của độc giả:", { MaDocGia: readerId });
+      console.log("Không tìm thấy tủ sách của độc giả:", {
+        MaDocGia: readerId,
+      });
       return res.status(404).send("Không tìm thấy tủ sách");
     }
 
@@ -2116,5 +2189,5 @@ module.exports = {
   getAllBooksOnShelf,
   removeBookFromShelf,
   checkBookInShelf,
-  createBorrowingSlip
+  createBorrowingSlip,
 };

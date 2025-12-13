@@ -453,15 +453,61 @@ async function lendBook(data) {
   try {
     const { MaSach, MaDocGia, SoLuongMuon } = data;
 
+    // THÊM: Kiểm tra xem độc giả đã có bản ghi mượn sách này chưa
+    const existingRecord = await TheoDoiMuonSach.findOne({
+      MaSach: MaSach,
+      MaDocGia: MaDocGia,
+      TrangThai: { $in: ["pending", "processing", "approved", "overdue"] },
+    });
+
+    if (existingRecord) {
+      // Trả về error với thông tin chi tiết
+      return {
+        success: false,
+        error: "BOOK_ALREADY_BORROWED",
+        message:
+          "Bạn đang có yêu cầu mượn sách này. Vui lòng trả sách hoặc chờ xử lý xong trước khi mượn lại!",
+        currentStatus: existingRecord.TrangThai,
+      };
+    }
+
+    // Tạo phiếu mượn mới
+    const phieuMuon = new PhieuMuon({
+      MaDocGia: MaDocGia,
+      TrangThai: "pending",
+      NgayTao: new Date(),
+    });
+
+    const savedPhieuMuon = await phieuMuon.save();
+
+    // Tạo bản ghi TheoDoiMuonSach với MaPhieuMuon
     const record = new TheoDoiMuonSach({
       MaSach,
       MaDocGia,
       SoLuong: SoLuongMuon,
       TrangThai: "pending",
+      MaPhieuMuon: savedPhieuMuon._id,
     });
 
     const savedRecord = await record.save();
-    return savedRecord;
+
+    // Xóa sách khỏi tủ sách
+    await TuSach.updateOne(
+      { MaDocGia: MaDocGia },
+      {
+        $pull: {
+          DanhSachSach: {
+            MaSach: MaSach,
+          },
+        },
+      }
+    );
+
+    return {
+      success: true,
+      record: savedRecord,
+      phieuMuonId: savedPhieuMuon._id,
+    };
   } catch (err) {
     console.error("Lỗi khi mượn sách:", err);
     throw err;
@@ -502,6 +548,7 @@ async function getTrackBorrowBook() {
         path: "Msnv",
         select: "Msnv HoTenNV ChucVu",
       })
+      .populate("MaPhieuMuon")
       .sort({ createdAt: -1 }); // Sắp xếp theo thời gian tạo mới nhất
 
     return trackBorrowList;
@@ -739,6 +786,29 @@ async function updateReturnStatus(requestId, adminId, status, bookCondition) {
       updateFields,
       { new: true }
     );
+
+    // ====== KIỂM TRA VÀ CẬP NHẬT TRẠNG THÁI PHIẾU MƯỢN ======
+    const phieuMuonId = request.MaPhieuMuon;
+    if (phieuMuonId) {
+      // Lấy tất cả sách trong phiếu mượn
+      const allBooksInSlip = await TheoDoiMuonSach.find({
+        MaPhieuMuon: phieuMuonId,
+      });
+
+      // Kiểm tra xem tất cả sách đã được trả chưa
+      const allReturned = allBooksInSlip.every(
+        (book) => book.TrangThai === "returned" && book.NgayGhiNhanTra
+      );
+
+      if (allReturned) {
+        // Cập nhật trạng thái phiếu mượn thành 'completed'
+        const PhieuMuon = mongoose.model("PhieuMuon");
+        await PhieuMuon.findByIdAndUpdate(phieuMuonId, {
+          TrangThai: "completed",
+          NgayHoanThanh: now,
+        });
+      }
+    }
 
     return updated;
   } catch (err) {
@@ -2770,11 +2840,11 @@ async function getAllGiangVienForAdmin() {
       docGiaList.map(async (docGia) => {
         const giangVien = await GiangVien.findOne({ MaDocGia: docGia._id })
           .populate({
-            path: 'MaBoMon',
+            path: "MaBoMon",
             populate: {
-              path: 'MaKhoa',
-              select: 'TenKhoa'
-            }
+              path: "MaKhoa",
+              select: "TenKhoa",
+            },
           })
           .select("MaCanBo HocVi MaBoMon")
           .lean();
@@ -2936,8 +3006,8 @@ async function getStatisticBook() {
         select: "HoTen MaNhanVien",
       })
       .populate({
-        path: "MaPhieuMuon",  
-        select: "_id",         
+        path: "MaPhieuMuon",
+        select: "_id",
       })
       .lean();
 
@@ -3203,6 +3273,21 @@ async function getAllBoMon() {
 }
 
 async function addBookIntoShelf(bookId, readerId) {
+  // THÊM: Kiểm tra xem sách có đang trong trạng thái mượn không
+  const borrowingRecord = await TheoDoiMuonSach.findOne({
+    MaSach: bookId,
+    MaDocGia: readerId,
+    TrangThai: { $nin: ["returned", "denied"] }, // Loại trừ returned và denied
+  });
+
+  if (borrowingRecord) {
+    return {
+      error: "BOOK_IN_USE",
+      message:
+        "Bạn đang có yêu cầu mượn sách này chưa hoàn tất. Không thể thêm vào tủ sách!",
+    };
+  }
+
   // Tìm tủ sách của độc giả
   let shelf = await TuSach.findOne({ MaDocGia: readerId });
 
@@ -3241,21 +3326,21 @@ async function addBookIntoShelf(bookId, readerId) {
 
 async function getAllBooksOnShelf(readerId) {
   // Tìm tủ sách + populate đầy đủ thông tin sách
-  const shelf = await TuSach.findOne({ MaDocGia: readerId })
-    .populate({
-      path: "DanhSachSach.MaSach",
-      select: "_id MaSach TenSach Image TacGia MoTaSach SoQuyen NamXuatBan LoaiSach",
-      populate: [
-        {
-          path: "MaTheLoai",
-          select: "TenTheLoai"
-        },
-        {
-          path: "Khoa",
-          select: "TenKhoa"
-        }
-      ]
-    });
+  const shelf = await TuSach.findOne({ MaDocGia: readerId }).populate({
+    path: "DanhSachSach.MaSach",
+    select:
+      "_id MaSach TenSach Image TacGia MoTaSach SoQuyen NamXuatBan LoaiSach",
+    populate: [
+      {
+        path: "MaTheLoai",
+        select: "TenTheLoai",
+      },
+      {
+        path: "Khoa",
+        select: "TenKhoa",
+      },
+    ],
+  });
 
   if (!shelf) {
     return null;
@@ -3430,5 +3515,5 @@ module.exports = {
   getAllBooksOnShelf,
   removeBookFromShelf,
   checkBookInShelf,
-  createBorrowingSlip
+  createBorrowingSlip,
 };
